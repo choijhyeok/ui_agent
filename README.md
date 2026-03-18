@@ -61,4 +61,4 @@ Provider selection remains environment-driven through `LLM_PROVIDER`, with `open
 - Selection capability is isolated behind `packages/selection-adapter` because `Agentation` is useful as a reference but ships under PolyForm Shield.
 - Shared contracts in `packages/shared-types` are the authority for downstream issues.
 
-Reference analysis and build-vs-fork decisions live in [docs/reference-adoption.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-40/docs/reference-adoption.md). Contract details live in [docs/contracts.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-40/docs/contracts.md).
+Reference analysis and build-vs-fork decisions live in [docs/reference-adoption.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-42/docs/reference-adoption.md). Contract details live in [docs/contracts.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-42/docs/contracts.md).
