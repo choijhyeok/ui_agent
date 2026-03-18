@@ -6,6 +6,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-local_figma}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "${POSTGRES_HOST_PORT:-55432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infra/migrations:/docker-entrypoint-initdb.d:ro
@@ -21,7 +23,7 @@ services:
       dockerfile: apps/agent/Dockerfile
     restart: unless-stopped
     environment:
-      AGENT_PORT: ${AGENT_PORT:-8123}
+      AGENT_PORT: 8123
       DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@postgres:5432/local_figma}
       LLM_PROVIDER: ${LLM_PROVIDER:-openai}
       LLM_MODEL: ${LLM_MODEL:-gpt-4.1}
@@ -33,7 +35,7 @@ services:
       AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
       AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-10-21}
     ports:
-      - "${AGENT_PORT:-8123}:8123"
+      - "${AGENT_HOST_PORT:-8123}:8123"
     volumes:
       - ./workspace:/app/workspace
     depends_on:
@@ -51,10 +53,10 @@ services:
       dockerfile: apps/runtime/Dockerfile
     restart: unless-stopped
     environment:
-      RUNTIME_PORT: ${RUNTIME_PORT:-3001}
-      RUNTIME_PUBLIC_URL: ${RUNTIME_PUBLIC_URL:-http://localhost:3001}
+      RUNTIME_PORT: 3001
+      RUNTIME_PUBLIC_URL: ${RUNTIME_PUBLIC_URL:-http://localhost:${RUNTIME_HOST_PORT:-3001}}
     ports:
-      - "${RUNTIME_PORT:-3001}:3001"
+      - "${RUNTIME_HOST_PORT:-3001}:3001"
     volumes:
       - ./workspace:/app/workspace
     healthcheck:
@@ -69,11 +71,13 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     environment:
-      WEB_PORT: ${WEB_PORT:-3000}
-      AGENT_URL: http://agent:8123
-      RUNTIME_URL: ${RUNTIME_PUBLIC_URL:-http://localhost:3001}
+      WEB_PORT: 3000
+      AGENT_URL: ${AGENT_PUBLIC_URL:-http://localhost:${AGENT_HOST_PORT:-8123}}
+      AGENT_SERVER_URL: http://agent:8123
+      RUNTIME_URL: ${RUNTIME_PUBLIC_URL:-http://localhost:${RUNTIME_HOST_PORT:-3001}}
+      RUNTIME_SERVER_URL: http://runtime:3001
     ports:
-      - "${WEB_PORT:-3000}:3000"
+      - "${WEB_HOST_PORT:-3000}:3000"
     depends_on:
       agent:
         condition: service_healthy

@@ -1,0 +1,50 @@
+:root {
+  --bg: #f5f1e8;
+  --bg-strong: #f0e5d3;
+  --surface: rgba(255, 252, 245, 0.82);
+  --surface-strong: rgba(255, 255, 255, 0.94);
+  --surface-dark: #1d2938;
+  --surface-dark-soft: rgba(29, 41, 56, 0.82);
+  --ink: #182230;
+  --ink-soft: #536171;
+  --line: rgba(24, 34, 48, 0.12);
+  --line-strong: rgba(24, 34, 48, 0.22);
+  --ready: #0f766e;
+  --warn: #b45309;
+  --error: #b42318;
+  --accent: #0f4c81;
+  --accent-strong: #12395b;
+  --shadow: 0 24px 70px rgba(24, 34, 48, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.16), transparent 24rem),
+    radial-gradient(circle at top right, rgba(15, 76, 129, 0.14), transparent 22rem),
+    linear-gradient(140deg, var(--bg), #f7f8fc 50%, var(--bg-strong));
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}

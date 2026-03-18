@@ -1,6 +1,6 @@
-# Local Figma Foundation
+# Local Figma
 
-`HOW-40` establishes the monorepo skeleton, Docker Compose bootstrap, shared contracts, and reference adoption plan for a local AI-native UI workspace.
+`HOW-40` established the monorepo skeleton, Docker Compose bootstrap, shared contracts, and reference adoption plan for a local AI-native UI workspace. `HOW-41` adds the first real operator-facing web shell in `apps/web`.
 
 ## Workspace layout
 
@@ -8,7 +8,7 @@
 apps/
   agent/      LangGraph-oriented orchestration service bootstrap
   runtime/    Live preview runtime bootstrap serving files from workspace/
-  web/        Operator workspace shell bootstrap
+  web/        Next.js operator workspace shell
 packages/
   shared-types/       Cross-service contracts
   design-schema/      Structured design intent helpers
@@ -31,7 +31,7 @@ docs/
 2. Fill the provider credentials for either OpenAI or Azure OpenAI.
 3. Run `docker compose up --build`.
 
-The foundation bootstrap exposes:
+The current bootstrap exposes:
 
 - Web shell: `http://localhost:3000`
 - Agent health/config: `http://localhost:8123/health`
@@ -49,11 +49,17 @@ The agent service now runs a minimal LangGraph flow with these stages:
 
 Provider selection remains environment-driven through `LLM_PROVIDER`, with `openai` and `azure-openai` normalized behind the same HTTP surface.
 
+If the default published ports are already in use on your machine, override the host bindings before startup:
+
+- `POSTGRES_HOST_PORT=55433 AGENT_HOST_PORT=8124 RUNTIME_HOST_PORT=3002 WEB_HOST_PORT=3003 docker compose up --build`
+
 ## Validation
 
 - `docker compose config`
-- `pnpm install`
+- `corepack pnpm install`
 - `pnpm typecheck:contracts`
+- `corepack pnpm --filter @local-figma/web typecheck`
+- `corepack pnpm --filter @local-figma/web build`
 
 ## Key decisions
 

@@ -2,8 +2,23 @@
   "name": "@local-figma/web",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "scripts": {
-    "dev": "node server.mjs"
+    "dev": "next dev -H 0.0.0.0 -p ${WEB_PORT:-3000}",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p ${WEB_PORT:-3000}",
+    "typecheck": "tsc -p tsconfig.json --pretty false"
+  },
+  "dependencies": {
+    "@local-figma/preview-bridge": "workspace:*",
+    "@local-figma/shared-types": "workspace:*",
+    "next": "^15.2.2",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "typescript": "^5.8.2"
   }
 }
