@@ -38,6 +38,8 @@ services:
       AZURE_OPENAI_API_VERSION: ${AZURE_OPENAI_API_VERSION:-2024-10-21}
     ports:
       - "${AGENT_PORT:-8123}:8123"
+    volumes:
+      - ./workspace:/app/workspace
     depends_on:
       postgres:
         condition: service_healthy

@@ -35,8 +35,19 @@ The foundation bootstrap exposes:
 
 - Web shell: `http://localhost:3000`
 - Agent health/config: `http://localhost:8123/health`
+- Agent orchestration: `POST http://localhost:8123/orchestrate`
+- Agent provider smoke path: `POST http://localhost:8123/provider/smoke`
 - Runtime preview stub: `http://localhost:3001`
 - Postgres: `localhost:55432`
+
+The agent service now runs a minimal LangGraph flow with these stages:
+
+- intent classification
+- project state load
+- patch planning
+- response formatting
+
+Provider selection remains environment-driven through `LLM_PROVIDER`, with `openai` and `azure-openai` normalized behind the same HTTP surface.
 
 ## Validation
 
