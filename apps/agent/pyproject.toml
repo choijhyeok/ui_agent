@@ -1,0 +1,5 @@
+[project]
+name = "local-figma-agent"
+version = "0.0.0"
+requires-python = ">=3.11"
+description = "Foundation bootstrap for the Local Figma agent service"
