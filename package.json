@@ -1,0 +1,13 @@
+{
+  "name": "local-figma",
+  "private": true,
+  "packageManager": "pnpm@10.6.2",
+  "scripts": {
+    "dev": "docker compose up --build",
+    "typecheck:contracts": "tsc -p packages/shared-types/tsconfig.json --pretty false",
+    "check:compose": "docker compose config"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2"
+  }
+}

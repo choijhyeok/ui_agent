@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Local Figma Runtime Bootstrap</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "IBM Plex Sans", sans-serif;
+        background: #f5efe6;
+        color: #14213d;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top left, rgba(250, 163, 7, 0.2), transparent 28rem),
+          linear-gradient(135deg, #f5efe6, #dfe7fd);
+      }
+      main {
+        width: min(48rem, calc(100vw - 3rem));
+        padding: 2rem;
+        border-radius: 1.5rem;
+        background: rgba(255, 255, 255, 0.78);
+        box-shadow: 0 20px 60px rgba(20, 33, 61, 0.12);
+        backdrop-filter: blur(10px);
+      }
+      h1 {
+        margin-top: 0;
+        font-size: clamp(2rem, 4vw, 3.5rem);
+      }
+      p {
+        line-height: 1.6;
+      }
+      code {
+        padding: 0.15rem 0.35rem;
+        border-radius: 0.35rem;
+        background: rgba(20, 33, 61, 0.08);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Runtime bootstrap is live.</h1>
+      <p>
+        Foundation mounted <code>workspace/</code> into the runtime container and is serving a real local page.
+        Downstream runtime work will replace this placeholder with the generated React application.
+      </p>
+    </main>
+  </body>
+  </html>

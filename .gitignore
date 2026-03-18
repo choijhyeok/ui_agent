@@ -1,0 +1,11 @@
+node_modules
+.pnpm-store
+dist
+.turbo
+.next
+__pycache__
+.venv
+.pytest_cache
+.env
+apps/agent/.venv
+workspace/.cache
