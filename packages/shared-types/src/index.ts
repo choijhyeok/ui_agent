@@ -121,6 +121,14 @@ export interface RuntimeHealth {
   error?: string;
 }
 
+export interface SessionMemory {
+  sessionId: string;
+  summary: string;
+  structuredMemory: Record<string, JsonValue>;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
 export interface Session {
   id: string;
   createdAt: string;
@@ -129,4 +137,12 @@ export interface Session {
   manifest: ProjectManifest;
   summary?: string;
   latestDesignIntent?: DesignIntent;
+}
+
+export interface SessionRestoreSnapshot {
+  session: Session;
+  memory: SessionMemory;
+  messages: Message[];
+  selectedElements: SelectedElement[];
+  patchRecords: PatchRecord[];
 }

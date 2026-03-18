@@ -14,7 +14,7 @@
 
 ## Required contracts
 
-The canonical TypeScript definitions are implemented in [packages/shared-types/src/index.ts](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-40/packages/shared-types/src/index.ts).
+The canonical TypeScript definitions are implemented in [packages/shared-types/src/index.ts](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-44/packages/shared-types/src/index.ts).
 
 ### `Session`
 
@@ -74,4 +74,5 @@ Postgres is the authority for:
 - patch history
 - runtime health snapshots
 
-The bootstrap schema is in [infra/migrations/0001_init.sql](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-40/infra/migrations/0001_init.sql).
+The bootstrap schema is in [infra/migrations/0001_init.sql](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-44/infra/migrations/0001_init.sql).
+The persistence upgrade for session memory, selected elements, and patch-record enrichment is in [infra/migrations/0002_persistence.sql](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-44/infra/migrations/0002_persistence.sql).
