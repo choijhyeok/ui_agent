@@ -3,52 +3,194 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Local Figma Runtime Bootstrap</title>
+    <title>Local Figma Runtime Preview</title>
     <style>
       :root {
-        color-scheme: light;
-        font-family: "IBM Plex Sans", sans-serif;
-        background: #f5efe6;
-        color: #14213d;
+        color: #0f172a;
+        background:
+          radial-gradient(circle at top left, rgba(251, 191, 36, 0.28), transparent 18rem),
+          linear-gradient(180deg, #fffdf7, #f1f5f9);
+        font-family: "Space Grotesk", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
       }
       body {
         margin: 0;
-        min-height: 100vh;
+      }
+      .page {
         display: grid;
-        place-items: center;
-        background:
-          radial-gradient(circle at top left, rgba(250, 163, 7, 0.2), transparent 28rem),
-          linear-gradient(135deg, #f5efe6, #dfe7fd);
-      }
-      main {
-        width: min(48rem, calc(100vw - 3rem));
+        gap: 1.5rem;
+        min-height: 100vh;
         padding: 2rem;
+      }
+      .hero,
+      .panel {
+        background: rgba(255, 255, 255, 0.86);
+        border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 1.5rem;
-        background: rgba(255, 255, 255, 0.78);
-        box-shadow: 0 20px 60px rgba(20, 33, 61, 0.12);
-        backdrop-filter: blur(10px);
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
+        padding: 1.5rem;
       }
-      h1 {
+      .hero h1,
+      .panel h2 {
         margin-top: 0;
-        font-size: clamp(2rem, 4vw, 3.5rem);
       }
-      p {
-        line-height: 1.6;
+      .grid {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+      }
+      .metric {
+        background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(16, 185, 129, 0.12));
+        border-radius: 1rem;
+        padding: 1rem;
+      }
+      .metric strong,
+      .bridge-row strong {
+        display: block;
+        margin-bottom: 0.35rem;
+      }
+      .bridge {
+        display: grid;
+        gap: 0.75rem;
+      }
+      .bridge-row {
+        border-radius: 1rem;
+        background: #f8fafc;
+        padding: 0.9rem 1rem;
       }
       code {
-        padding: 0.15rem 0.35rem;
-        border-radius: 0.35rem;
-        background: rgba(20, 33, 61, 0.08);
+        padding: 0.1rem 0.35rem;
+        border-radius: 0.3rem;
+        background: rgba(15, 23, 42, 0.08);
       }
     </style>
   </head>
   <body>
-    <main>
-      <h1>Runtime bootstrap is live.</h1>
-      <p>
-        Foundation mounted <code>workspace/</code> into the runtime container and is serving a real local page.
-        Downstream runtime work will replace this placeholder with the generated React application.
-      </p>
+    <main class="page">
+      <section class="hero">
+        <h1>Generated Runtime Preview</h1>
+        <p>
+          The runtime serves the mounted <code>workspace/</code> volume and exposes a live iframe bridge back to the operator shell.
+          Downstream generation work can replace this page with a richer React app without changing the preview contract.
+        </p>
+      </section>
+
+      <section class="panel">
+        <h2>Runtime status</h2>
+        <div class="grid">
+          <div class="metric">
+            <strong>Preview origin</strong>
+            <span id="preview-origin">loading</span>
+          </div>
+          <div class="metric">
+            <strong>Build ID</strong>
+            <span id="build-id">loading</span>
+          </div>
+          <div class="metric">
+            <strong>Runtime status</strong>
+            <span id="runtime-status">starting</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Bridge events</h2>
+        <div class="bridge">
+          <div class="bridge-row">
+            <strong>Parent connection</strong>
+            <span id="parent-connection">Waiting for host</span>
+          </div>
+          <div class="bridge-row">
+            <strong>Last event</strong>
+            <span id="last-event">runtime boot</span>
+          </div>
+        </div>
+      </section>
     </main>
+
+    <script>
+      const bridgeVersion = "2026-03-19";
+      const previewPath = "/preview";
+      const parentConnection = document.getElementById("parent-connection");
+      const lastEvent = document.getElementById("last-event");
+      const previewOrigin = document.getElementById("preview-origin");
+      const buildId = document.getElementById("build-id");
+      const runtimeStatus = document.getElementById("runtime-status");
+      const parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
+
+      previewOrigin.textContent = window.location.origin;
+
+      function postToParent(type, payload) {
+        const targetOrigin = parentOrigin ?? "*";
+        window.parent.postMessage({
+          version: bridgeVersion,
+          source: "runtime",
+          type,
+          payload,
+        }, targetOrigin);
+      }
+
+      async function fetchHealth() {
+        const response = await fetch("/health", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("Runtime health request failed");
+        }
+        return response.json();
+      }
+
+      async function publishHealth(eventType) {
+        const health = await fetchHealth();
+        buildId.textContent = health.buildId;
+        runtimeStatus.textContent = health.status;
+        postToParent(eventType, eventType === "runtime.ready" ? { health, previewPath } : health);
+        return health;
+      }
+
+      window.addEventListener("message", async (event) => {
+        if (parentOrigin && event.origin !== parentOrigin) {
+          return;
+        }
+
+        const data = event.data;
+        if (!data || data.version !== bridgeVersion || data.source !== "web") {
+          return;
+        }
+
+        if (data.type === "host.ready") {
+          parentConnection.textContent = "Connected to " + event.origin;
+          lastEvent.textContent = "host.ready";
+          await publishHealth("runtime.ready");
+          return;
+        }
+
+        if (data.type === "runtime.ping") {
+          lastEvent.textContent = "runtime.ping";
+          await publishHealth("runtime.health");
+          return;
+        }
+
+        if (data.type === "runtime.reload") {
+          lastEvent.textContent = "runtime.reload (" + data.payload.reason + ")";
+          postToParent("runtime.reloaded", {
+            reason: data.payload.reason,
+            reloadedAt: new Date().toISOString(),
+          });
+          window.location.reload();
+        }
+      });
+
+      publishHealth("runtime.ready").catch((error) => {
+        runtimeStatus.textContent = "error";
+        lastEvent.textContent = error.message;
+      });
+      window.setInterval(() => {
+        publishHealth("runtime.health").catch((error) => {
+          runtimeStatus.textContent = "error";
+          lastEvent.textContent = error.message;
+        });
+      }, 15000);
+    </script>
   </body>
-  </html>
+</html>
