@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from local_figma_agent.api import create_app
+from local_figma_agent import providers
 
 
 def reset_provider_env(monkeypatch):
@@ -109,3 +110,29 @@ def test_provider_smoke_uses_mock_when_credentials_missing(monkeypatch):
     payload = response.json()
     assert payload["invoked"] is True
     assert payload["output"] == "pong"
+
+
+def test_provider_smoke_uses_openai_sdk_path_when_credentials_exist(monkeypatch):
+    reset_provider_env(monkeypatch)
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+
+    class FakeResponses:
+        def create(self, *, model, input):
+            assert model == "gpt-4.1"
+            assert input == "Return the single word pong."
+            return type("FakeResponse", (), {"output_text": "pong-from-sdk"})()
+
+    class FakeOpenAI:
+        def __init__(self, **kwargs):
+            assert kwargs["api_key"] == "test-key"
+            self.responses = FakeResponses()
+
+    monkeypatch.setattr(providers, "OpenAI", FakeOpenAI)
+    client = TestClient(create_app())
+
+    response = client.post("/provider/smoke")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "openai"
+    assert payload["output"] == "pong-from-sdk"
