@@ -1,5 +1,6 @@
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+export type BridgeMessageSource = "web" | "runtime";
 
 export type MessageRole = "system" | "user" | "assistant" | "tool";
 export type ProviderKind = "openai" | "azure-openai";
@@ -127,6 +128,37 @@ export interface SessionMemory {
   structuredMemory: Record<string, JsonValue>;
   createdAt: string | null;
   updatedAt: string | null;
+}
+
+export interface PreviewBridgeEnvelope<TType extends string, TPayload extends JsonValue | object> {
+  version: "2026-03-19";
+  source: BridgeMessageSource;
+  type: TType;
+  payload: TPayload;
+}
+
+export interface PreviewHostReadyPayload {
+  sessionId?: string;
+  sentAt: string;
+}
+
+export interface PreviewRuntimePingPayload {
+  requestedAt: string;
+}
+
+export interface PreviewRuntimeReloadPayload {
+  reason: string;
+  requestedAt: string;
+}
+
+export interface PreviewRuntimeReadyPayload {
+  health: RuntimeHealth;
+  previewPath: string;
+}
+
+export interface PreviewRuntimeReloadedPayload {
+  reason: string;
+  reloadedAt: string;
 }
 
 export interface Session {

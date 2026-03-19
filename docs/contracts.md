@@ -74,5 +74,6 @@ Postgres is the authority for:
 - patch history
 - runtime health snapshots
 
+<<<<<<< HEAD
 The bootstrap schema is in [infra/migrations/0001_init.sql](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-44/infra/migrations/0001_init.sql).
 The persistence upgrade for session memory, selected elements, and patch-record enrichment is in [infra/migrations/0002_persistence.sql](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-44/infra/migrations/0002_persistence.sql).
