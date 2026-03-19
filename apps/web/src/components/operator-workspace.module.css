@@ -1,0 +1,397 @@
+.page {
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  gap: 20px;
+  min-height: calc(100vh - 48px);
+}
+
+.sessions,
+.chatColumn,
+.previewColumn {
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  backdrop-filter: blur(18px);
+  box-shadow: var(--shadow);
+}
+
+.sessions {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 24px;
+  background: linear-gradient(180deg, var(--surface-dark), var(--surface-dark-soft));
+  color: #f5f7fb;
+}
+
+.chatColumn,
+.previewColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  background: var(--surface);
+}
+
+.brandBlock h1,
+.topBar h2,
+.previewHeader h2,
+.sectionHeader h2 {
+  margin: 0;
+}
+
+.brandCopy,
+.placeholderPanel p,
+.healthCard p,
+.previewStatusCard p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.72;
+}
+
+.sessionList,
+.sidePanel,
+.bottomPanels {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sectionHeader span,
+.topBarMeta span,
+.sessionItem span,
+.sessionItemActive span,
+.sessionItem small,
+.sessionItemActive small,
+.messageMeta span,
+.streamingTag {
+  color: var(--ink-soft);
+}
+
+.sessions .sectionHeader span,
+.sessions .sessionItem span,
+.sessions .sessionItemActive span,
+.sessions .sessionItem small {
+  color: rgba(245, 247, 251, 0.68);
+}
+
+.sessionItem,
+.sessionItemActive,
+.ghostButton,
+.primaryButton {
+  border: 0;
+  transition: transform 140ms ease, background-color 140ms ease, border-color 140ms ease;
+}
+
+.sessionItem,
+.sessionItemActive {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit;
+}
+
+.sessionItem:hover,
+.sessionItemActive:hover,
+.ghostButton:hover,
+.primaryButton:hover {
+  transform: translateY(-1px);
+}
+
+.sessionItemActive {
+  background: linear-gradient(160deg, rgba(234, 179, 8, 0.26), rgba(15, 118, 110, 0.26));
+  outline: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.ghostButton,
+.primaryButton {
+  padding: 10px 14px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.ghostButton {
+  background: rgba(24, 34, 48, 0.06);
+  color: inherit;
+}
+
+.sessions .ghostButton {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.primaryButton {
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: white;
+}
+
+.healthStack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.healthCard,
+.previewStatusCard,
+.composerCard,
+.placeholderPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 22px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+}
+
+.sessions .healthCard {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.healthHeader,
+.messageMeta,
+.previewHeader,
+.topBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.statePill {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ready {
+  background: rgba(15, 118, 110, 0.12);
+  color: var(--ready);
+}
+
+.degraded {
+  background: rgba(180, 83, 9, 0.12);
+  color: var(--warn);
+}
+
+.error {
+  background: rgba(180, 35, 24, 0.12);
+  color: var(--error);
+}
+
+.topBar {
+  align-items: flex-end;
+}
+
+.topBarMeta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.chatFeed {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 320px;
+  padding-right: 4px;
+  overflow: auto;
+}
+
+.assistantBubble,
+.userBubble {
+  max-width: 90%;
+  padding: 16px 18px;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  box-shadow: 0 12px 24px rgba(24, 34, 48, 0.06);
+}
+
+.assistantBubble {
+  align-self: flex-start;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.userBubble {
+  align-self: flex-end;
+  background: linear-gradient(160deg, rgba(15, 76, 129, 0.1), rgba(234, 179, 8, 0.12));
+}
+
+.assistantBubble p,
+.userBubble p {
+  margin: 0;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.streamingTag {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.composerLabel {
+  font-weight: 700;
+}
+
+.composer {
+  width: 100%;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  border-radius: 18px;
+  background: white;
+  padding: 14px 16px;
+  color: inherit;
+}
+
+.composerFooter {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.stageBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bottomPanels {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.previewColumn {
+  min-width: 0;
+}
+
+.previewHeader {
+  align-items: flex-end;
+}
+
+.previewActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.previewTelemetry {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.telemetryCard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.telemetryLabel {
+  color: var(--ink-soft);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.iframeFrame {
+  flex: 1;
+  min-height: 480px;
+  padding: 12px;
+  border-radius: 26px;
+  background: rgba(17, 24, 39, 0.9);
+  border: 1px solid rgba(17, 24, 39, 0.22);
+}
+
+.previewIframe {
+  width: 100%;
+  height: 100%;
+  min-height: 560px;
+  border: 0;
+  border-radius: 18px;
+  background: white;
+}
+
+.healthCard code,
+.previewStatusCard code,
+.placeholderPanel code {
+  overflow-wrap: anywhere;
+  color: inherit;
+}
+
+@media (max-width: 1280px) {
+  .shell {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+
+  .previewColumn {
+    grid-column: 1 / -1;
+  }
+
+  .iframeFrame,
+  .previewIframe {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 860px) {
+  .page {
+    padding: 16px;
+  }
+
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .bottomPanels {
+    grid-template-columns: 1fr;
+  }
+
+  .previewTelemetry {
+    grid-template-columns: 1fr;
+  }
+
+  .topBar,
+  .previewHeader,
+  .composerFooter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
