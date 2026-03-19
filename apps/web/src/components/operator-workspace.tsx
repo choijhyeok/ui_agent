@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { PREVIEW_BRIDGE_VERSION, isPreviewBridgeEvent } from "@local-figma/preview-bridge";
 import type { PreviewBridgeToHostEvent } from "@local-figma/preview-bridge";
-import type { MessageRole, RuntimeHealth, SelectedElement } from "@local-figma/shared-types";
+import type { MessageRole, PatchPlan, RuntimeHealth, SelectedElement } from "@local-figma/shared-types";
+import type { OrchestrationResponse } from "@/src/lib/agent-api";
 import type { WorkspaceStatusSnapshot } from "@/src/lib/workspace-status";
 import styles from "./operator-workspace.module.css";
 
@@ -33,17 +34,6 @@ const seedSessions: SessionSummary[] = [
   { id: "session-041", label: "HOW-41 Workspace Shell", state: "live", lastAction: "Chat and preview scaffolding" },
   { id: "session-018", label: "Selection Overlay Spike", state: "review", lastAction: "Awaiting adapter contract" },
   { id: "session-006", label: "Runtime Bootstrap", state: "archived", lastAction: "Placeholder page mounted" },
-];
-
-const initialMessages: UiMessage[] = [
-  {
-    id: "assistant-welcome",
-    role: "assistant",
-    content:
-      "Describe the workspace you want to shape. I will keep the request in-session, show runtime health, and prepare the preview surface for targeted edits.",
-    timestamp: new Date().toISOString(),
-    status: "done",
-  },
 ];
 
 const streamStages = ["Interpreting request", "Checking runtime health", "Preparing patch outline"];
@@ -94,8 +84,27 @@ function formatRuntimeHealth(health: RuntimeHealth) {
 }
 
 function summarizeSelectedElement(element: SelectedElement) {
-  const sourceHint = element.sourceHint?.filePath ? ` in ${element.sourceHint.filePath}` : "";
-  return `${element.selector}${sourceHint}`;
+  const componentHint = element.componentHint ? ` (${element.componentHint})` : "";
+  return `${element.kind}: ${element.selector}${componentHint}`;
+}
+
+function formatBounds(bounds: SelectedElement["bounds"]) {
+  return `${Math.round(bounds.x)}, ${Math.round(bounds.y)} ${Math.round(bounds.width)}x${Math.round(bounds.height)}`;
+}
+
+function isRuntimeHealth(value: unknown): value is RuntimeHealth {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<RuntimeHealth>;
+  return (
+    typeof candidate.projectId === "string" &&
+    typeof candidate.status === "string" &&
+    typeof candidate.runtimeUrl === "string" &&
+    typeof candidate.buildId === "string" &&
+    typeof candidate.lastHeartbeatAt === "string"
+  );
 }
 
 export function OperatorWorkspace({
@@ -106,19 +115,32 @@ export function OperatorWorkspace({
   runtimeUrl: string;
 }) {
   const [status, setStatus] = useState(initialStatus);
-  const [messages, setMessages] = useState(initialMessages);
+  const [messages, setMessages] = useState<UiMessage[]>(() => [
+    {
+      id: "assistant-welcome",
+      role: "assistant",
+      content:
+        "Describe the workspace you want to shape. I will keep the request in-session, show runtime health, and prepare the preview surface for targeted edits.",
+      timestamp: initialStatus.checkedAt,
+      status: "done",
+    },
+  ]);
   const [composer, setComposer] = useState("");
   const [activeSessionId, setActiveSessionId] = useState(seedSessions[0]?.id ?? "");
   const [streamStage, setStreamStage] = useState<string | null>(null);
   const [iframeNonce, setIframeNonce] = useState(0);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
   const [bridgeState, setBridgeState] = useState<BridgeState>({
     state: "connecting",
     buildId: "Unknown",
     lastEvent: "Waiting for runtime",
-    runtimeStatus: initialStatus.runtime.summary,
+      runtimeStatus: initialStatus.runtime.summary,
   });
-  const [selectedElement, setSelectedElement] = useState<string>("Selection details will appear here once the preview adapter emits a target.");
+  const [selectedElement, setSelectedElement] = useState<SelectedElement | null>(null);
+  const [selectionStatus, setSelectionStatus] = useState("Choose an element or drag an area in the preview to capture selection context.");
+  const [latestPatchPlan, setLatestPatchPlan] = useState<PatchPlan | null>(null);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const runtimeOrigin = new URL(runtimeUrl).origin;
 
@@ -131,6 +153,49 @@ export function OperatorWorkspace({
   }, []);
 
   useEffect(() => {
+    setSelectedElement(null);
+    setLatestPatchPlan(null);
+    setSelectionStatus("Choose an element or drag an area in the preview to capture selection context.");
+    if (iframeLoaded) {
+      handshakeBridge("reconnecting");
+    }
+  }, [activeSessionId, iframeLoaded]);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    async function persistSelection(nextSelection: SelectedElement) {
+      setSelectedElement(nextSelection);
+      setSelectionStatus("Saving selection payload...");
+
+      try {
+        const response = await fetch(`/api/sessions/${activeSessionId}/selected-elements`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            ...nextSelection,
+            sessionId: activeSessionId,
+          }),
+        });
+        const payload = (await response.json()) as
+          | { persisted: boolean; selectedElement: SelectedElement }
+          | { error: string };
+
+        if (!response.ok || "error" in payload) {
+          throw new Error("error" in payload ? payload.error : `HTTP ${response.status}`);
+        }
+
+        setSelectedElement(payload.selectedElement);
+        setSelectionStatus(payload.persisted ? "Selection payload saved for the active session." : "Selection captured locally; persistence is unavailable.");
+      } catch (error) {
+        setSelectionStatus(error instanceof Error ? error.message : "Selection persistence failed.");
+      }
+    }
+
     function handleBridgeMessage(event: MessageEvent) {
       if (event.origin !== runtimeOrigin || !isPreviewBridgeEvent(event.data) || event.data.source !== "runtime") {
         return;
@@ -157,7 +222,7 @@ export function OperatorWorkspace({
       }
 
       if (message.type === "selection.changed") {
-        setSelectedElement(summarizeSelectedElement(message.payload));
+        void persistSelection(message.payload);
       }
     }
 
@@ -241,8 +306,6 @@ export function OperatorWorkspace({
 
     const timestamp = new Date().toISOString();
     const assistantId = `assistant-${crypto.randomUUID()}`;
-    const reply = buildAssistantReply(prompt, status);
-    const stageWindow = Math.max(1, Math.floor(reply.length / streamStages.length));
 
     setMessages((current) => [
       ...current,
@@ -252,22 +315,52 @@ export function OperatorWorkspace({
     setComposer("");
     setStreamStage(streamStages[0] ?? null);
 
-    for (let index = 1; index <= reply.length; index += 1) {
-      if (index % stageWindow === 0) {
-        const nextStage = streamStages[Math.min(streamStages.length - 1, Math.floor(index / stageWindow))];
-        setStreamStage(nextStage ?? streamStages.at(-1) ?? null);
+    try {
+      await sleep(80);
+      setStreamStage(streamStages[1] ?? null);
+
+      const response = await fetch("/api/orchestrate", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          sessionId: activeSessionId,
+          message: prompt,
+          selectedElement,
+          runtimeStatus: isRuntimeHealth(status.runtime.raw) ? status.runtime.raw : undefined,
+        }),
+      });
+      const payload = (await response.json()) as OrchestrationResponse | { error: string };
+
+      if (!response.ok || "error" in payload) {
+        throw new Error("error" in payload ? payload.error : `HTTP ${response.status}`);
       }
 
-      const partial = reply.slice(0, index);
+      setStreamStage(streamStages[2] ?? null);
+      setLatestPatchPlan(payload.patchPlan);
+      setBridgeState(formatRuntimeHealth(payload.runtimeStatus));
       setMessages((current) =>
         current.map((message) =>
-          message.id === assistantId ? { ...message, content: partial, status: index === reply.length ? "done" : "streaming" } : message,
+          message.id === assistantId ? { ...message, content: payload.response, status: "done" } : message,
         ),
       );
-      await sleep(16);
+    } catch (error) {
+      const fallback = buildAssistantReply(prompt, status);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === assistantId
+            ? {
+                ...message,
+                content: `${fallback} Orchestration failed: ${error instanceof Error ? error.message : "Unknown error"}.`,
+                status: "done",
+              }
+            : message,
+        ),
+      );
+    } finally {
+      setStreamStage(null);
     }
-
-    setStreamStage(null);
   }
 
   return (
@@ -331,7 +424,7 @@ export function OperatorWorkspace({
             </div>
             <div className={styles.topBarMeta}>
               <span>Active session: {activeSessionId}</span>
-              <span>Checked {formatTime(status.checkedAt)}</span>
+              <span>Checked {isHydrated ? formatTime(status.checkedAt) : "--:--"}</span>
             </div>
           </div>
 
@@ -340,7 +433,7 @@ export function OperatorWorkspace({
               <article key={message.id} className={message.role === "assistant" ? styles.assistantBubble : styles.userBubble}>
                 <div className={styles.messageMeta}>
                   <strong>{message.role === "assistant" ? "Operator Agent" : "You"}</strong>
-                  <span>{formatTime(message.timestamp)}</span>
+                  <span>{isHydrated ? formatTime(message.timestamp) : "--:--"}</span>
                 </div>
                 <p>{message.content || "..."}</p>
                 {message.status === "streaming" ? <small className={styles.streamingTag}>Streaming reply</small> : null}
@@ -375,23 +468,40 @@ export function OperatorWorkspace({
             <section className={styles.placeholderPanel}>
               <div className={styles.sectionHeader}>
                 <h2>Diff / patch status</h2>
-                <span>Placeholder</span>
+                <span>{latestPatchPlan ? latestPatchPlan.strategy : "Waiting"}</span>
               </div>
-              <p>
-                Reserve this surface for patch plans, file deltas, and rollback state once the patch engine and runtime edit loop are
-                connected.
-              </p>
+              {latestPatchPlan ? (
+                <>
+                  <p>Planner target: {latestPatchPlan.target.intentSummary}</p>
+                  <p>Files: {latestPatchPlan.target.files.join(", ") || "No files resolved yet"}</p>
+                  <p>Steps: {latestPatchPlan.steps.join(" ")}</p>
+                </>
+              ) : (
+                <p>The planner response will appear here once a request is sent with or without selection context.</p>
+              )}
             </section>
             <section className={styles.placeholderPanel}>
               <div className={styles.sectionHeader}>
                 <h2>Selected element context</h2>
-                <span>Adapter seam</span>
+                <span>{selectedElement ? selectedElement.kind : "Idle"}</span>
               </div>
-              <p>{selectedElement}</p>
-              <p>
-                The preview bridge is ready for events like <code>{bridgeHint}</code>. Selection payloads land here once the runtime
-                emits them.
-              </p>
+              {selectedElement ? (
+                <>
+                  <p>{summarizeSelectedElement(selectedElement)}</p>
+                  <p>Bounds: {formatBounds(selectedElement.bounds)}</p>
+                  <p>Note: {selectedElement.note || "No note captured"}</p>
+                  <p>Component hint: {selectedElement.componentHint || "Not inferred"}</p>
+                  <p>Saved status: {selectionStatus}</p>
+                </>
+              ) : (
+                <>
+                  <p>{selectionStatus}</p>
+                  <p>
+                    The preview bridge is ready for events like <code>{bridgeHint}</code>. Selection payloads land here once the runtime
+                    emits them.
+                  </p>
+                </>
+              )}
             </section>
           </div>
         </section>
@@ -448,7 +558,10 @@ export function OperatorWorkspace({
               ref={iframeRef}
               key={iframeNonce}
               className={styles.previewIframe}
-              onLoad={() => handshakeBridge("connecting")}
+              onLoad={() => {
+                setIframeLoaded(true);
+                handshakeBridge("connecting");
+              }}
               src={runtimeUrl}
               title="Local Figma runtime preview"
             />

@@ -22,7 +22,7 @@ export function getWorkspaceUrls() {
   };
 }
 
-function getWorkspaceServiceUrls() {
+export function getWorkspaceServiceUrls() {
   return {
     agentUrl: process.env.AGENT_SERVER_URL ?? process.env.AGENT_URL ?? "http://localhost:8123",
     runtimeUrl: process.env.RUNTIME_SERVER_URL ?? process.env.RUNTIME_URL ?? "http://localhost:3001",

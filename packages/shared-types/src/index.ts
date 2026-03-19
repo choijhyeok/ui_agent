@@ -78,10 +78,13 @@ export interface ElementBounds {
 export interface SelectedElement {
   id: string;
   sessionId: string;
+  kind: "element" | "area";
   selector: string;
   domPath: string[];
   textSnippet?: string;
   bounds: ElementBounds;
+  note?: string;
+  componentHint?: string;
   sourceHint?: {
     filePath?: string;
     exportName?: string;

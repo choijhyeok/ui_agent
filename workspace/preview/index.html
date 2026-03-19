@@ -18,6 +18,10 @@
       body {
         margin: 0;
       }
+      button,
+      input {
+        font: inherit;
+      }
       .page {
         display: grid;
         gap: 1.5rem;
@@ -26,7 +30,8 @@
       }
       .hero,
       .panel {
-        background: rgba(255, 255, 255, 0.86);
+        position: relative;
+        background: rgba(255, 255, 255, 0.88);
         border: 1px solid rgba(148, 163, 184, 0.2);
         border-radius: 1.5rem;
         box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
@@ -60,49 +65,235 @@
         background: #f8fafc;
         padding: 0.9rem 1rem;
       }
+      .selection-shell {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 20;
+        width: min(24rem, calc(100vw - 2rem));
+        border-radius: 1.25rem;
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        background: rgba(255, 255, 255, 0.92);
+        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
+        backdrop-filter: blur(14px);
+        padding: 1rem;
+      }
+      .selection-shell h2 {
+        margin: 0;
+        font-size: 1rem;
+      }
+      .selection-copy {
+        margin: 0.35rem 0 0.9rem;
+        color: #475569;
+        font-size: 0.92rem;
+      }
+      .selection-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.5rem;
+      }
+      .selection-button {
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        background: #f8fafc;
+        color: #0f172a;
+        border-radius: 999px;
+        padding: 0.55rem 0.9rem;
+      }
+      .selection-button-active {
+        border-color: rgba(15, 76, 129, 0.4);
+        background: #0f4c81;
+        color: white;
+      }
+      .selection-field {
+        display: grid;
+        gap: 0.45rem;
+        margin-top: 0.9rem;
+      }
+      .selection-field label {
+        font-size: 0.82rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .selection-field input {
+        width: 100%;
+        border: 1px solid rgba(15, 23, 42, 0.14);
+        border-radius: 0.85rem;
+        padding: 0.7rem 0.9rem;
+        background: rgba(248, 250, 252, 0.92);
+      }
+      .selection-status {
+        margin: 0.9rem 0 0;
+        color: #334155;
+        font-size: 0.9rem;
+      }
+      .selection-highlight,
+      .selection-marquee {
+        position: fixed;
+        pointer-events: none;
+        z-index: 19;
+        border-radius: 1rem;
+      }
+      .selection-highlight {
+        border: 2px solid #0f4c81;
+        background: rgba(15, 76, 129, 0.08);
+        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.08);
+        display: none;
+      }
+      .selection-marquee {
+        border: 2px dashed rgba(15, 76, 129, 0.8);
+        background: rgba(15, 76, 129, 0.12);
+        display: none;
+      }
+      .selection-label {
+        position: fixed;
+        z-index: 21;
+        pointer-events: none;
+        border-radius: 999px;
+        background: #0f172a;
+        color: white;
+        padding: 0.3rem 0.65rem;
+        font-size: 0.82rem;
+        display: none;
+      }
+      [data-selectable="true"] {
+        transition:
+          transform 120ms ease,
+          box-shadow 120ms ease,
+          outline-color 120ms ease;
+      }
+      [data-selectable="true"]:hover {
+        outline: 2px solid rgba(15, 76, 129, 0.55);
+        transform: translateY(-1px);
+      }
       code {
         padding: 0.1rem 0.35rem;
         border-radius: 0.3rem;
         background: rgba(15, 23, 42, 0.08);
       }
+      @media (max-width: 900px) {
+        .selection-shell {
+          position: sticky;
+          top: 0;
+          right: auto;
+          width: 100%;
+        }
+        .page {
+          padding-top: 1rem;
+        }
+      }
     </style>
   </head>
   <body>
+    <aside class="selection-shell" data-selection-ignore="true">
+      <h2>Selection overlay</h2>
+      <p class="selection-copy">Choose a mode, then click a target or drag a region. The note is attached to the next capture.</p>
+      <div class="selection-actions">
+        <button class="selection-button selection-button-active" id="mode-element" type="button">Element click</button>
+        <button class="selection-button" id="mode-area" type="button">Area drag</button>
+      </div>
+      <div class="selection-field">
+        <label for="selection-note">Selection note</label>
+        <input id="selection-note" placeholder="Example: tighten padding but keep CTA hierarchy" type="text" />
+      </div>
+      <p class="selection-status" id="selection-status">Waiting for a selection capture.</p>
+    </aside>
+
+    <div class="selection-highlight" id="selection-highlight"></div>
+    <div class="selection-marquee" id="selection-marquee"></div>
+    <div class="selection-label" id="selection-label"></div>
+
     <main class="page">
-      <section class="hero">
+      <section
+        class="hero"
+        data-component-hint="GeneratedPreviewHero"
+        data-export-name="GeneratedPreviewHero"
+        data-selectable="true"
+        data-selection-id="hero"
+        data-source-file="preview/index.html"
+      >
         <h1>Generated Runtime Preview</h1>
         <p>
           The runtime serves the mounted <code>workspace/</code> volume and exposes a live iframe bridge back to the operator shell.
-          Downstream generation work can replace this page with a richer React app without changing the preview contract.
+          This preview now captures element or region selection payloads for targeted edits.
         </p>
       </section>
 
-      <section class="panel">
+      <section
+        class="panel"
+        data-component-hint="RuntimeStatusPanel"
+        data-export-name="RuntimeStatusPanel"
+        data-selectable="true"
+        data-selection-id="runtime-status-panel"
+        data-source-file="preview/index.html"
+      >
         <h2>Runtime status</h2>
         <div class="grid">
-          <div class="metric">
+          <div
+            class="metric"
+            data-component-hint="PreviewOriginMetric"
+            data-export-name="PreviewOriginMetric"
+            data-selectable="true"
+            data-selection-id="preview-origin-metric"
+            data-source-file="preview/index.html"
+          >
             <strong>Preview origin</strong>
             <span id="preview-origin">loading</span>
           </div>
-          <div class="metric">
+          <div
+            class="metric"
+            data-component-hint="BuildIdMetric"
+            data-export-name="BuildIdMetric"
+            data-selectable="true"
+            data-selection-id="build-id-metric"
+            data-source-file="preview/index.html"
+          >
             <strong>Build ID</strong>
             <span id="build-id">loading</span>
           </div>
-          <div class="metric">
+          <div
+            class="metric"
+            data-component-hint="RuntimeHealthMetric"
+            data-export-name="RuntimeHealthMetric"
+            data-selectable="true"
+            data-selection-id="runtime-health-metric"
+            data-source-file="preview/index.html"
+          >
             <strong>Runtime status</strong>
             <span id="runtime-status">starting</span>
           </div>
         </div>
       </section>
 
-      <section class="panel">
+      <section
+        class="panel"
+        data-component-hint="BridgeEventsPanel"
+        data-export-name="BridgeEventsPanel"
+        data-selectable="true"
+        data-selection-id="bridge-events-panel"
+        data-source-file="preview/index.html"
+      >
         <h2>Bridge events</h2>
         <div class="bridge">
-          <div class="bridge-row">
+          <div
+            class="bridge-row"
+            data-component-hint="ParentConnectionRow"
+            data-export-name="ParentConnectionRow"
+            data-selectable="true"
+            data-selection-id="parent-connection-row"
+            data-source-file="preview/index.html"
+          >
             <strong>Parent connection</strong>
             <span id="parent-connection">Waiting for host</span>
           </div>
-          <div class="bridge-row">
+          <div
+            class="bridge-row"
+            data-component-hint="LastEventRow"
+            data-export-name="LastEventRow"
+            data-selectable="true"
+            data-selection-id="last-event-row"
+            data-source-file="preview/index.html"
+          >
             <strong>Last event</strong>
             <span id="last-event">runtime boot</span>
           </div>
@@ -119,17 +310,207 @@
       const buildId = document.getElementById("build-id");
       const runtimeStatus = document.getElementById("runtime-status");
       const parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
+      const selectionHighlight = document.getElementById("selection-highlight");
+      const selectionMarquee = document.getElementById("selection-marquee");
+      const selectionLabel = document.getElementById("selection-label");
+      const selectionStatus = document.getElementById("selection-status");
+      const selectionNoteInput = document.getElementById("selection-note");
+      const elementModeButton = document.getElementById("mode-element");
+      const areaModeButton = document.getElementById("mode-area");
+      const selectionState = {
+        activeSelection: null,
+        draftNote: "",
+        mode: "element",
+        sessionId: "session-preview",
+        dragOrigin: null,
+      };
 
       previewOrigin.textContent = window.location.origin;
 
       function postToParent(type, payload) {
         const targetOrigin = parentOrigin ?? "*";
-        window.parent.postMessage({
-          version: bridgeVersion,
-          source: "runtime",
-          type,
-          payload,
-        }, targetOrigin);
+        window.parent.postMessage(
+          {
+            version: bridgeVersion,
+            source: "runtime",
+            type,
+            payload,
+          },
+          targetOrigin,
+        );
+      }
+
+      function collapseText(value) {
+        return value.replace(/\s+/g, " ").trim().slice(0, 160);
+      }
+
+      function rectToBounds(rect) {
+        return {
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      }
+
+      function buildDomPath(element) {
+        const path = [];
+        let current = element;
+
+        while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.body) {
+          const selectionId = current.dataset.selectionId;
+          if (selectionId) {
+            path.unshift(`[data-selection-id="${selectionId}"]`);
+          } else {
+            const parent = current.parentElement;
+            const siblings = parent ? Array.from(parent.children).filter((child) => child.tagName === current.tagName) : [];
+            const siblingIndex = siblings.indexOf(current) + 1;
+            path.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${Math.max(1, siblingIndex)})`);
+          }
+          current = current.parentElement;
+        }
+
+        path.unshift("body");
+        return path;
+      }
+
+      function inferComponentHint(element) {
+        if (element.dataset.componentHint) {
+          return element.dataset.componentHint;
+        }
+        if (element.id) {
+          return element.id;
+        }
+        const firstClass = Array.from(element.classList)[0];
+        if (firstClass) {
+          return firstClass;
+        }
+        return element.tagName.toLowerCase();
+      }
+
+      function buildSelector(element) {
+        if (element.dataset.selectionId) {
+          return `[data-selection-id="${element.dataset.selectionId}"]`;
+        }
+        if (element.id) {
+          return `#${element.id}`;
+        }
+        return `${element.tagName.toLowerCase()}.${Array.from(element.classList).join(".")}`.replace(/\.$/, "");
+      }
+
+      function buildSourceHint(element) {
+        const filePath = element.dataset.sourceFile;
+        const exportName = element.dataset.exportName || inferComponentHint(element);
+        const line = Number(element.dataset.sourceLine || 0) || undefined;
+        if (!filePath && !exportName && !line) {
+          return undefined;
+        }
+        return {
+          filePath,
+          exportName,
+          line,
+        };
+      }
+
+      function updateSelectionOverlay(bounds, label) {
+        selectionHighlight.style.display = "block";
+        selectionHighlight.style.left = `${bounds.x}px`;
+        selectionHighlight.style.top = `${bounds.y}px`;
+        selectionHighlight.style.width = `${bounds.width}px`;
+        selectionHighlight.style.height = `${bounds.height}px`;
+        selectionLabel.style.display = "block";
+        selectionLabel.textContent = label;
+        selectionLabel.style.left = `${bounds.x}px`;
+        selectionLabel.style.top = `${Math.max(10, bounds.y - 34)}px`;
+      }
+
+      function clearMarquee() {
+        selectionMarquee.style.display = "none";
+      }
+
+      function setMode(mode) {
+        selectionState.mode = mode;
+        elementModeButton.classList.toggle("selection-button-active", mode === "element");
+        areaModeButton.classList.toggle("selection-button-active", mode === "area");
+        selectionStatus.textContent = mode === "element" ? "Click a preview element to capture it." : "Drag across the preview to capture an area.";
+      }
+
+      function findSelectableElement(node) {
+        if (!(node instanceof Element)) {
+          return null;
+        }
+        return node.closest("[data-selectable='true']");
+      }
+
+      function emitSelection(payload) {
+        selectionState.activeSelection = payload;
+        updateSelectionOverlay(payload.bounds, `${payload.kind} • ${payload.componentHint || payload.selector}`);
+        selectionStatus.textContent = `${payload.kind} captured: ${payload.selector}`;
+        postToParent("selection.changed", payload);
+      }
+
+      function buildElementSelection(element) {
+        const rect = element.getBoundingClientRect();
+        return {
+          id: `selection-${crypto.randomUUID()}`,
+          sessionId: selectionState.sessionId,
+          kind: "element",
+          selector: buildSelector(element),
+          domPath: buildDomPath(element),
+          textSnippet: collapseText(element.textContent || ""),
+          bounds: rectToBounds(rect),
+          note: selectionState.draftNote || "",
+          componentHint: inferComponentHint(element),
+          sourceHint: buildSourceHint(element),
+          capturedAt: new Date().toISOString(),
+        };
+      }
+
+      function intersects(a, b) {
+        return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
+      }
+
+      function commonDomPath(elements) {
+        const paths = elements.map((element) => buildDomPath(element));
+        const shortest = Math.min(...paths.map((path) => path.length));
+        const shared = [];
+        for (let index = 0; index < shortest; index += 1) {
+          const segment = paths[0][index];
+          if (paths.every((path) => path[index] === segment)) {
+            shared.push(segment);
+          } else {
+            break;
+          }
+        }
+        return shared.length > 0 ? shared : ["body"];
+      }
+
+      function buildAreaSelection(rect) {
+        const selectionRect = {
+          left: rect.x,
+          top: rect.y,
+          right: rect.x + rect.width,
+          bottom: rect.y + rect.height,
+        };
+        const selectableElements = Array.from(document.querySelectorAll("[data-selectable='true']")).filter((element) =>
+          intersects(selectionRect, element.getBoundingClientRect()),
+        );
+        const textSnippet = collapseText(selectableElements.map((element) => element.textContent || "").join(" "));
+        const firstTarget = selectableElements[0];
+
+        return {
+          id: `selection-${crypto.randomUUID()}`,
+          sessionId: selectionState.sessionId,
+          kind: "area",
+          selector: `area(${rect.x},${rect.y},${rect.width},${rect.height})`,
+          domPath: selectableElements.length > 0 ? commonDomPath(selectableElements) : ["body"],
+          textSnippet,
+          bounds: rect,
+          note: selectionState.draftNote || "",
+          componentHint: firstTarget ? inferComponentHint(firstTarget) : "RegionSelection",
+          sourceHint: firstTarget ? buildSourceHint(firstTarget) : { filePath: "preview/index.html", exportName: "RegionSelection" },
+          capturedAt: new Date().toISOString(),
+        };
       }
 
       async function fetchHealth() {
@@ -148,6 +529,79 @@
         return health;
       }
 
+      selectionNoteInput.addEventListener("input", (event) => {
+        selectionState.draftNote = event.target.value.trim();
+      });
+
+      elementModeButton.addEventListener("click", () => setMode("element"));
+      areaModeButton.addEventListener("click", () => setMode("area"));
+
+      window.addEventListener("pointerdown", (event) => {
+        const target = event.target instanceof Element ? event.target : null;
+        if (event.button !== 0 || target?.closest("[data-selection-ignore='true']")) {
+          return;
+        }
+
+        if (selectionState.mode === "element") {
+          const selectableTarget = findSelectableElement(target);
+          if (!selectableTarget) {
+            return;
+          }
+          event.preventDefault();
+          emitSelection(buildElementSelection(selectableTarget));
+          return;
+        }
+
+        selectionState.dragOrigin = { x: event.clientX, y: event.clientY };
+        selectionMarquee.style.display = "block";
+        selectionMarquee.style.left = `${event.clientX}px`;
+        selectionMarquee.style.top = `${event.clientY}px`;
+        selectionMarquee.style.width = "0px";
+        selectionMarquee.style.height = "0px";
+      });
+
+      window.addEventListener("pointermove", (event) => {
+        if (selectionState.mode !== "area" || !selectionState.dragOrigin) {
+          return;
+        }
+
+        const x = Math.min(selectionState.dragOrigin.x, event.clientX);
+        const y = Math.min(selectionState.dragOrigin.y, event.clientY);
+        const width = Math.abs(selectionState.dragOrigin.x - event.clientX);
+        const height = Math.abs(selectionState.dragOrigin.y - event.clientY);
+        selectionMarquee.style.left = `${x}px`;
+        selectionMarquee.style.top = `${y}px`;
+        selectionMarquee.style.width = `${width}px`;
+        selectionMarquee.style.height = `${height}px`;
+      });
+
+      window.addEventListener("pointerup", (event) => {
+        if (selectionState.mode !== "area" || !selectionState.dragOrigin) {
+          return;
+        }
+
+        const x = Math.min(selectionState.dragOrigin.x, event.clientX);
+        const y = Math.min(selectionState.dragOrigin.y, event.clientY);
+        const width = Math.abs(selectionState.dragOrigin.x - event.clientX);
+        const height = Math.abs(selectionState.dragOrigin.y - event.clientY);
+        selectionState.dragOrigin = null;
+        clearMarquee();
+
+        if (width < 12 || height < 12) {
+          selectionStatus.textContent = "Area selection ignored because the drag region was too small.";
+          return;
+        }
+
+        emitSelection(
+          buildAreaSelection({
+            x: Math.round(x),
+            y: Math.round(y),
+            width: Math.round(width),
+            height: Math.round(height),
+          }),
+        );
+      });
+
       window.addEventListener("message", async (event) => {
         if (parentOrigin && event.origin !== parentOrigin) {
           return;
@@ -159,6 +613,7 @@
         }
 
         if (data.type === "host.ready") {
+          selectionState.sessionId = data.payload.sessionId || selectionState.sessionId;
           parentConnection.textContent = "Connected to " + event.origin;
           lastEvent.textContent = "host.ready";
           await publishHealth("runtime.ready");
@@ -181,6 +636,7 @@
         }
       });
 
+      setMode("element");
       publishHealth("runtime.ready").catch((error) => {
         runtimeStatus.textContent = "error";
         lastEvent.textContent = error.message;
