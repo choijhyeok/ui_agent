@@ -55,6 +55,7 @@ services:
     restart: unless-stopped
     environment:
       RUNTIME_PORT: ${RUNTIME_PORT:-3001}
+      RUNTIME_PUBLIC_URL: ${RUNTIME_PUBLIC_URL:-http://localhost:3001}
     ports:
       - "${RUNTIME_PORT:-3001}:3001"
     volumes:
@@ -74,7 +75,7 @@ services:
     environment:
       WEB_PORT: ${WEB_PORT:-3000}
       AGENT_URL: http://agent:8123
-      RUNTIME_URL: http://runtime:3001
+      RUNTIME_URL: ${RUNTIME_PUBLIC_URL:-http://localhost:3001}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:
