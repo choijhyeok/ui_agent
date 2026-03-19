@@ -35,8 +35,19 @@ The foundation bootstrap exposes:
 
 - Web shell: `http://localhost:3000`
 - Agent health/config: `http://localhost:8123/health`
+- Agent orchestration: `POST http://localhost:8123/orchestrate`
+- Agent provider smoke path: `POST http://localhost:8123/provider/smoke`
 - Runtime preview stub: `http://localhost:3001`
-- Postgres: `localhost:55432`
+- Postgres is only exposed on the internal Docker network by default.
+
+The agent service now runs a minimal LangGraph flow with these stages:
+
+- intent classification
+- project state load
+- patch planning
+- response formatting
+
+Provider selection remains environment-driven through `LLM_PROVIDER`, with `openai` and `azure-openai` normalized behind the same HTTP surface.
 
 ## Validation
 
@@ -50,4 +61,4 @@ The foundation bootstrap exposes:
 - Selection capability is isolated behind `packages/selection-adapter` because `Agentation` is useful as a reference but ships under PolyForm Shield.
 - Shared contracts in `packages/shared-types` are the authority for downstream issues.
 
-Reference analysis and build-vs-fork decisions live in [docs/reference-adoption.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-40/docs/reference-adoption.md). Contract details live in [docs/contracts.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-40/docs/contracts.md).
+Reference analysis and build-vs-fork decisions live in [docs/reference-adoption.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-42/docs/reference-adoption.md). Contract details live in [docs/contracts.md](/Users/jaehyeokchoi/code/local-figma-workspaces/HOW-42/docs/contracts.md).
