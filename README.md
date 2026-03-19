@@ -38,7 +38,7 @@ The foundation bootstrap exposes:
 - Agent orchestration: `POST http://localhost:8123/orchestrate`
 - Agent provider smoke path: `POST http://localhost:8123/provider/smoke`
 - Runtime preview stub: `http://localhost:3001`
-- Postgres: `localhost:55432`
+- Postgres is only exposed on the internal Docker network by default.
 
 The agent service now runs a minimal LangGraph flow with these stages:
 

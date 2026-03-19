@@ -136,3 +136,53 @@ def test_provider_smoke_uses_openai_sdk_path_when_credentials_exist(monkeypatch)
     payload = response.json()
     assert payload["provider"] == "openai"
     assert payload["output"] == "pong-from-sdk"
+
+
+def test_provider_smoke_uses_azure_chat_fallback_for_older_api_versions(monkeypatch):
+    reset_provider_env(monkeypatch)
+    monkeypatch.setenv("LLM_PROVIDER", "azure")
+    monkeypatch.setenv("LLM_MODEL", "gpt-4.1")
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "azure-key")
+    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT", "gpt-4.1-deployment")
+    monkeypatch.setenv("AZURE_OPENAI_API_VERSION", "2024-12-01-preview")
+
+    class FakeResponses:
+        def create(self, **kwargs):
+            raise AssertionError("responses API should not be used for older Azure API versions")
+
+    class FakeChatCompletions:
+        def create(self, *, model, messages):
+            assert model == "gpt-4.1-deployment"
+            assert messages == [{"role": "user", "content": "Return the single word pong."}]
+            return type(
+                "FakeChatResponse",
+                (),
+                {
+                    "choices": [
+                        type(
+                            "FakeChoice",
+                            (),
+                            {"message": type("FakeMessage", (), {"content": "pong-from-azure-chat"})()},
+                        )()
+                    ]
+                },
+            )()
+
+    class FakeAzureOpenAI:
+        def __init__(self, **kwargs):
+            assert kwargs["api_key"] == "azure-key"
+            assert kwargs["api_version"] == "2024-12-01-preview"
+            assert kwargs["azure_endpoint"] == "https://example.openai.azure.com"
+            self.responses = FakeResponses()
+            self.chat = type("FakeChat", (), {"completions": FakeChatCompletions()})()
+
+    monkeypatch.setattr(providers, "AzureOpenAI", FakeAzureOpenAI)
+    client = TestClient(create_app())
+
+    response = client.post("/provider/smoke")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["provider"] == "azure-openai"
+    assert payload["output"] == "pong-from-azure-chat"

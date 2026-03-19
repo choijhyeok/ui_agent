@@ -9,6 +9,9 @@ from openai import AzureOpenAI, OpenAI
 from .models import LlmProviderConfig, ProviderSmokeResult
 
 
+AZURE_RESPONSES_MIN_API_VERSION = "2025-03-01-preview"
+
+
 def load_provider_config() -> LlmProviderConfig:
     raw_provider = os.getenv("LLM_PROVIDER", "openai")
     provider = "azure-openai" if raw_provider == "azure" else raw_provider
@@ -98,7 +101,7 @@ class AzureOpenAIProviderClient(ProviderClient):
 
     def complete_text(self, prompt: str) -> str:
         model = self.config.azureDeployment or self.config.model
-        if hasattr(self.client, "responses"):
+        if hasattr(self.client, "responses") and _azure_supports_responses_api(self.config):
             response = self.client.responses.create(
                 model=model,
                 input=prompt,
@@ -110,6 +113,11 @@ class AzureOpenAIProviderClient(ProviderClient):
             messages=[{"role": "user", "content": prompt}],
         )
         return response.choices[0].message.content or ""
+
+
+def _azure_supports_responses_api(config: LlmProviderConfig) -> bool:
+    version = config.azureApiVersion or ""
+    return version >= AZURE_RESPONSES_MIN_API_VERSION
 
 
 class MockProviderClient(ProviderClient):
