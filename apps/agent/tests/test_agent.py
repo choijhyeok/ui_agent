@@ -62,10 +62,13 @@ def test_modify_branch_uses_selection_context(monkeypatch):
             "selectedElement": {
                 "id": "sel-1",
                 "sessionId": "session-modify",
+                "kind": "element",
                 "selector": "[data-node='card-1']",
                 "domPath": ["main", "section", "article"],
                 "textSnippet": "Quarterly pipeline",
                 "bounds": {"x": 12, "y": 24, "width": 300, "height": 140},
+                "note": "Keep the CTA alignment intact.",
+                "componentHint": "PipelineCard",
                 "sourceHint": {"filePath": "preview/index.html", "exportName": "Card", "line": 12},
             },
         },
@@ -78,7 +81,10 @@ def test_modify_branch_uses_selection_context(monkeypatch):
     assert payload["patchPlan"]["target"]["selectedElementId"] == "sel-1"
     assert payload["patchPlan"]["target"]["files"] == ["preview/index.html"]
     assert payload["memory"]["selectedElements"][0]["selector"] == "[data-node='card-1']"
+    assert "Treat PipelineCard as the primary component hint." in payload["patchPlan"]["steps"]
+    assert "Honor the operator note: Keep the CTA alignment intact." in payload["patchPlan"]["steps"]
     assert "Selection context forwarded" in payload["response"]
+    assert "Component hint: PipelineCard." in payload["response"]
 
 
 def test_layout_restructure_branch(monkeypatch):

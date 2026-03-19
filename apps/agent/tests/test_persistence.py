@@ -63,10 +63,13 @@ class PersistenceIntegrationTest(unittest.TestCase):
             session_id,
             {
                 "id": f"selection-{uuid.uuid4().hex}",
+                "kind": "element",
                 "selector": "[data-testid='hero-card']",
                 "domPath": ["html", "body", "main", "section[0]"],
                 "textSnippet": "Refine this card",
                 "bounds": {"x": 24, "y": 96, "width": 320, "height": 180},
+                "note": "Preserve the CTA hierarchy.",
+                "componentHint": "HeroCard",
                 "sourceHint": {"filePath": "workspace/src/App.tsx", "exportName": "HeroCard", "line": 18},
                 "capturedAt": "2026-03-19T12:00:00+00:00",
             },
@@ -123,6 +126,7 @@ class PersistenceIntegrationTest(unittest.TestCase):
         self.assertEqual(restored["memory"]["summary"], memory["summary"])
         self.assertEqual(restored["memory"]["structuredMemory"]["selectedElementId"], selected_element["id"])
         self.assertEqual(restored["selectedElements"][0]["id"], selected_element["id"])
+        self.assertEqual(restored["selectedElements"][0]["componentHint"], "HeroCard")
         self.assertEqual(restored["patchRecords"][0]["id"], patch_record["id"])
 
 

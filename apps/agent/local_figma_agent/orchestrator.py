@@ -27,6 +27,10 @@ from .repository import SessionRepository, build_project_manifest, default_runti
 AgentState = dict[str, Any]
 
 
+def format_instruction(fragment: str) -> str:
+    return fragment if fragment.endswith((".", "!", "?")) else f"{fragment}."
+
+
 def classify_intent_kind(message: str, selected_element: Optional[SelectedElement]) -> IntentKind:
     lowered = message.lower()
     if any(token in lowered for token in ["restyle", "style", "theme", "color", "font", "slack-like", "openai-like", "notion-like", "naver-like"]):
@@ -171,6 +175,10 @@ def planner_node(state: AgentState) -> AgentState:
     ]
     if selected_element:
         steps.append(f"Scope changes to selector {selected_element.selector}.")
+        if selected_element.componentHint:
+            steps.append(f"Treat {selected_element.componentHint} as the primary component hint.")
+        if selected_element.note:
+            steps.append(f"Honor the operator note: {format_instruction(selected_element.note)}")
     if design_intent.styleReferences:
         labels = ", ".join(reference.label for reference in design_intent.styleReferences)
         steps.append(f"Blend style references: {labels}.")
@@ -198,6 +206,8 @@ def planner_node(state: AgentState) -> AgentState:
     summary_segments.append(f"Latest request classified as {intent_kind} for {design_intent.screenType}.")
     if selected_element and selected_element.textSnippet:
         summary_segments.append(f"Selection focus: {selected_element.textSnippet}.")
+    if selected_element and selected_element.note:
+        summary_segments.append(f"Selection note: {selected_element.note}.")
     state["memory"] = MemorySnapshot(
         summary=" ".join(segment for segment in summary_segments if segment).strip(),
         selectedElements=memory.selectedElements + ([selected_element] if selected_element else []),
@@ -251,6 +261,8 @@ def response_formatting_node(state: AgentState) -> AgentState:
     ]
     if request.selectedElement:
         response_lines.append(f"Selection context forwarded: {request.selectedElement.selector}.")
+        if request.selectedElement.componentHint:
+            response_lines.append(f"Component hint: {request.selectedElement.componentHint}.")
     if design_intent.styleReferences:
         response_lines.append(
             "Style references: "

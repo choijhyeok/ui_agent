@@ -249,12 +249,13 @@ class PostgresRepository:
 
     def create_selected_element(self, session_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         element_id = payload.get("id") or f"selection-{uuid.uuid4().hex}"
+        kind = payload.get("kind")
         selector = payload.get("selector")
         dom_path = payload.get("domPath")
         bounds = payload.get("bounds")
         captured_at = payload.get("capturedAt")
-        if not selector or dom_path is None or bounds is None or captured_at is None:
-            raise BadRequestError("selector, domPath, bounds, and capturedAt are required")
+        if not kind or not selector or dom_path is None or bounds is None or captured_at is None:
+            raise BadRequestError("kind, selector, domPath, bounds, and capturedAt are required")
 
         with self._connect() as connection:
             with connection.cursor() as cursor:
@@ -263,22 +264,28 @@ class PostgresRepository:
                     insert into selected_elements (
                       id,
                       session_id,
+                      kind,
                       selector,
                       dom_path,
                       text_snippet,
                       bounds,
+                      note,
+                      component_hint,
                       source_hint,
                       captured_at
                     )
-                    values (%s, %s, %s, %s::jsonb, %s, %s::jsonb, %s::jsonb, %s)
+                    values (%s, %s, %s, %s, %s::jsonb, %s, %s::jsonb, %s, %s, %s::jsonb, %s)
                     """,
                     (
                         element_id,
                         session_id,
+                        kind,
                         selector,
                         json.dumps(dom_path),
                         payload.get("textSnippet"),
                         json.dumps(bounds),
+                        payload.get("note"),
+                        payload.get("componentHint"),
                         json.dumps(payload.get("sourceHint")) if payload.get("sourceHint") is not None else None,
                         captured_at,
                     ),
@@ -288,10 +295,13 @@ class PostgresRepository:
         return {
             "id": element_id,
             "sessionId": session_id,
+            "kind": kind,
             "selector": selector,
             "domPath": dom_path,
             "textSnippet": payload.get("textSnippet"),
             "bounds": bounds,
+            "note": payload.get("note"),
+            "componentHint": payload.get("componentHint"),
             "sourceHint": payload.get("sourceHint"),
             "capturedAt": captured_at,
         }
@@ -301,7 +311,7 @@ class PostgresRepository:
             with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    select id, selector, dom_path, text_snippet, bounds, source_hint, captured_at
+                    select id, kind, selector, dom_path, text_snippet, bounds, note, component_hint, source_hint, captured_at
                     from selected_elements
                     where session_id = %s
                     order by captured_at asc, id asc
@@ -314,12 +324,15 @@ class PostgresRepository:
             {
                 "id": row[0],
                 "sessionId": session_id,
-                "selector": row[1],
-                "domPath": _decode_json(row[2]) or [],
-                "textSnippet": row[3],
-                "bounds": _decode_json(row[4]) or {},
-                "sourceHint": _decode_json(row[5]),
-                "capturedAt": row[6].isoformat(),
+                "kind": row[1],
+                "selector": row[2],
+                "domPath": _decode_json(row[3]) or [],
+                "textSnippet": row[4],
+                "bounds": _decode_json(row[5]) or {},
+                "note": row[6],
+                "componentHint": row[7],
+                "sourceHint": _decode_json(row[8]),
+                "capturedAt": row[9].isoformat(),
             }
             for row in rows
         ]

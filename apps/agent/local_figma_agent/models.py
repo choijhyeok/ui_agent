@@ -80,10 +80,13 @@ class SourceHint(BaseModel):
 class SelectedElement(BaseModel):
     id: str
     sessionId: str
+    kind: Literal["element", "area"]
     selector: str
     domPath: list[str]
     textSnippet: Optional[str] = None
     bounds: ElementBounds
+    note: Optional[str] = None
+    componentHint: Optional[str] = None
     sourceHint: Optional[SourceHint] = None
     capturedAt: str = Field(default_factory=utc_now)
 
