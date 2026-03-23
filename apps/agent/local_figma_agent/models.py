@@ -106,6 +106,16 @@ class PatchPlan(BaseModel):
     validation: list[str] = Field(default_factory=list)
 
 
+class PatchRecord(BaseModel):
+    id: str
+    sessionId: str
+    planId: str
+    status: Literal["planned", "applied", "failed", "rolled-back"]
+    filesChanged: list[str] = Field(default_factory=list)
+    summary: str = ""
+    createdAt: str = Field(default_factory=utc_now)
+
+
 class RuntimeHealth(BaseModel):
     projectId: str
     status: RuntimeStatusKind
@@ -165,6 +175,9 @@ class OrchestrationResponse(BaseModel):
     designIntent: DesignIntent
     manifest: ProjectManifest
     patchPlan: PatchPlan
+    patchRecord: Optional[PatchRecord] = None
+    patchValidation: Optional[dict] = None
+    filesWritten: list[str] = Field(default_factory=list)
     memory: MemorySnapshot
     runtimeStatus: RuntimeHealth
     response: str

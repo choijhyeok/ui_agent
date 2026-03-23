@@ -42,3 +42,12 @@ class PersistenceService:
 
     def restore_session(self, session_id: str) -> dict[str, Any]:
         return self.repository.restore_session(session_id)
+
+    def create_snapshot(self, snapshot_id: str, session_id: str, label: str, archive: bytes, file_list: list[str], patch_record_id: str | None = None) -> None:
+        return self.repository.create_snapshot(snapshot_id, session_id, label, archive, file_list, patch_record_id)
+
+    def get_snapshot(self, snapshot_id: str) -> dict[str, Any]:
+        return self.repository.get_snapshot(snapshot_id)
+
+    def list_snapshots(self, session_id: str) -> list[dict[str, Any]]:
+        return self.repository.list_snapshots(session_id)

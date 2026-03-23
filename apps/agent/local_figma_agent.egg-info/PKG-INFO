@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: local-figma-agent
+Version: 0.1.0
+Summary: LangGraph orchestration service for the Local Figma agent
+Requires-Python: >=3.11
+Requires-Dist: fastapi<1.0.0,>=0.115.12
+Requires-Dist: langgraph<1.0.0,>=0.6.0
+Requires-Dist: openai<2.0.0,>=1.75.0
+Requires-Dist: psycopg[binary]<4.0.0,>=3.2.6
+Requires-Dist: uvicorn<1.0.0,>=0.34.0
+Provides-Extra: dev
+Requires-Dist: httpx<1.0.0,>=0.28.1; extra == "dev"
+Requires-Dist: pytest<9.0.0,>=8.3.5; extra == "dev"

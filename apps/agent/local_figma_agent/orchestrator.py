@@ -13,6 +13,7 @@ from .models import (
     MessagePart,
     OrchestrationRequest,
     PatchPlan,
+    PatchRecord,
     PatchTarget,
     RuntimeHealth,
     SelectedElement,
@@ -20,8 +21,10 @@ from .models import (
     StyleReference,
     utc_now,
 )
+from .patch_executor import execute_patch
 from .providers import ProviderClient
 from .repository import SessionRepository, build_project_manifest, default_runtime_status
+from .source_mapper import enrich_selected_element, resolve_source
 
 
 AgentState = dict[str, Any]
@@ -160,8 +163,31 @@ def planner_node(state: AgentState) -> AgentState:
     memory: MemorySnapshot = state["memory"]
 
     strategy = "create" if intent_kind == "create" else "update"
+    mapping_info = None
+
     if selected_element:
         strategy = "targeted-update"
+        # Enrich selection with source mapping (LFG-9)
+        enriched, mapping_info = enrich_selected_element(selected_element)
+        selected_element = enriched
+        request = OrchestrationRequest(
+            sessionId=request.sessionId,
+            message=request.message,
+            selectedElement=enriched,
+            runtimeStatus=request.runtimeStatus,
+        )
+        state["request"] = request
+
+        # If mapping is ambiguous, add a fallback constraint
+        if mapping_info.ambiguous:
+            design_intent = design_intent.model_copy(update={
+                "lockedConstraints": design_intent.lockedConstraints + [
+                    f"Ambiguous selection detected – prefer region '{mapping_info.region_name}' "
+                    f"(confidence {mapping_info.confidence:.0%}). "
+                    f"Candidates: {', '.join(c.region_name or 'file-level' for c in mapping_info.candidates[:3])}."
+                ],
+            })
+            state["designIntent"] = design_intent
 
     target_files = []
     if selected_element and selected_element.sourceHint and selected_element.sourceHint.filePath:
@@ -179,6 +205,13 @@ def planner_node(state: AgentState) -> AgentState:
             steps.append(f"Treat {selected_element.componentHint} as the primary component hint.")
         if selected_element.note:
             steps.append(f"Honor the operator note: {format_instruction(selected_element.note)}")
+        if mapping_info and mapping_info.resolved:
+            steps.append(f"Source mapping resolved: region '{mapping_info.region_name}' "
+                         f"in {mapping_info.file_path} (confidence {mapping_info.confidence:.0%}).")
+            if mapping_info.ambiguous:
+                alt_names = [c.region_name or 'file-level' for c in mapping_info.candidates[1:3]]
+                steps.append(f"Ambiguous – alternative candidates: {', '.join(alt_names)}. "
+                             f"Using highest-confidence match.")
     if design_intent.styleReferences:
         labels = ", ".join(reference.label for reference in design_intent.styleReferences)
         steps.append(f"Blend style references: {labels}.")
@@ -214,6 +247,45 @@ def planner_node(state: AgentState) -> AgentState:
         messages=memory.messages,
     )
     state["patchPlan"] = patch_plan
+    return state
+
+
+def patch_execute_node(state: AgentState) -> AgentState:
+    """Execute the patch plan – generate/modify workspace files."""
+    patch_plan: PatchPlan = state["patchPlan"]
+    design_intent: DesignIntent = state["designIntent"]
+    manifest = state["manifest"]
+    request: OrchestrationRequest = state["request"]
+    provider_client: ProviderClient = state["providerClient"]
+
+    result = execute_patch(
+        plan=patch_plan,
+        design_intent=design_intent,
+        manifest=manifest,
+        provider_client=provider_client,
+        selected_element=request.selectedElement,
+    )
+
+    state["patchRecord"] = result.record
+    state["patchValidation"] = {
+        "ok": result.validation.ok,
+        "errors": result.validation.errors,
+        "warnings": result.validation.warnings,
+    }
+    state["filesWritten"] = result.files_written
+
+    # Update runtime status based on validation
+    runtime_status: RuntimeHealth = state["runtimeStatus"]
+    if not result.validation.ok:
+        state["runtimeStatus"] = RuntimeHealth(
+            projectId=runtime_status.projectId,
+            status="degraded",
+            runtimeUrl=runtime_status.runtimeUrl,
+            buildId=runtime_status.buildId,
+            lastHeartbeatAt=utc_now(),
+            error=result.error,
+        )
+
     return state
 
 
@@ -254,21 +326,44 @@ def response_formatting_node(state: AgentState) -> AgentState:
     repository.append_message(assistant_message)
     repository.update_summary(request.sessionId, memory.summary, design_intent.model_dump(mode="json"))
 
-    response_lines = [
-        f"Intent classified as {intent_kind}.",
-        f"Planned strategy: {patch_plan.strategy}.",
-        f"Target files: {', '.join(patch_plan.target.files) if patch_plan.target.files else 'none yet'}.",
-    ]
-    if request.selectedElement:
-        response_lines.append(f"Selection context forwarded: {request.selectedElement.selector}.")
-        if request.selectedElement.componentHint:
-            response_lines.append(f"Component hint: {request.selectedElement.componentHint}.")
+    patch_record: PatchRecord = state.get("patchRecord")
+    patch_validation = state.get("patchValidation", {})
+    files_written = state.get("filesWritten", [])
+
+    # Persist patch record
+    if patch_record:
+        repository.persist_patch_record(request.sessionId, patch_record)
+
+    # Build user-friendly response
+    intent_labels = {
+        "create": "워크스페이스를 생성했습니다",
+        "modify": "요청하신 수정을 적용했습니다",
+        "style-change": "스타일 변경을 적용했습니다",
+        "layout-restructure": "레이아웃을 재구성했습니다",
+    }
+    response_lines: list[str] = []
+
+    if patch_record and not patch_validation.get("ok", True):
+        errors = "; ".join(patch_validation.get("errors", []))
+        response_lines.append(f"⚠️ 빌드 오류가 발생하여 원래 파일로 복원했습니다: {errors}")
+    elif patch_record and patch_record.status == "applied":
+        action_label = intent_labels.get(intent_kind, "요청을 처리했습니다")
+        response_lines.append(f"✅ {action_label}.")
+        if files_written:
+            names = ", ".join(f.split("/")[-1] for f in files_written)
+            response_lines.append(f"변경 파일: {names}")
+        if request.selectedElement and request.selectedElement.componentHint:
+            response_lines.append(
+                f"선택된 컴포넌트 `{request.selectedElement.componentHint}`에 변경을 적용했습니다."
+            )
+        elif request.selectedElement:
+            response_lines.append("선택된 요소에 변경을 적용했습니다.")
+    else:
+        response_lines.append(intent_labels.get(intent_kind, "요청을 처리 중입니다") + ".")
+
     if design_intent.styleReferences:
-        response_lines.append(
-            "Style references: "
-            + ", ".join(reference.label for reference in design_intent.styleReferences)
-            + "."
-        )
+        refs = ", ".join(ref.label for ref in design_intent.styleReferences)
+        response_lines.append(f"참고 스타일: {refs}")
     state["memory"] = MemorySnapshot(
         summary=memory.summary,
         selectedElements=memory.selectedElements,
@@ -307,7 +402,9 @@ class AgentOrchestrator:
                 "layout-restructure": "planner",
             },
         )
-        graph.add_edge("planner", "response_formatting")
+        graph.add_edge("planner", "patch_execute")
+        graph.add_node("patch_execute", patch_execute_node)
+        graph.add_edge("patch_execute", "response_formatting")
         graph.add_edge("response_formatting", END)
         return graph.compile()
 

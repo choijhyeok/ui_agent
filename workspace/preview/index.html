@@ -1,652 +1,984 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Local Figma Runtime Preview</title>
-    <style>
-      :root {
-        color: #0f172a;
-        background:
-          radial-gradient(circle at top left, rgba(251, 191, 36, 0.28), transparent 18rem),
-          linear-gradient(180deg, #fffdf7, #f1f5f9);
-        font-family: "Space Grotesk", sans-serif;
-      }
-      * {
-        box-sizing: border-box;
-      }
-      body {
-        margin: 0;
-      }
-      button,
-      input {
-        font: inherit;
-      }
-      .page {
-        display: grid;
-        gap: 1.5rem;
-        min-height: 100vh;
-        padding: 2rem;
-      }
-      .hero,
-      .panel {
-        position: relative;
-        background: rgba(255, 255, 255, 0.88);
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        border-radius: 1.5rem;
-        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.08);
-        padding: 1.5rem;
-      }
-      .hero h1,
-      .panel h2 {
-        margin-top: 0;
-      }
-      .grid {
-        display: grid;
-        gap: 1rem;
-        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-      }
-      .metric {
-        background: linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(16, 185, 129, 0.12));
-        border-radius: 1rem;
-        padding: 1rem;
-      }
-      .metric strong,
-      .bridge-row strong {
-        display: block;
-        margin-bottom: 0.35rem;
-      }
-      .bridge {
-        display: grid;
-        gap: 0.75rem;
-      }
-      .bridge-row {
-        border-radius: 1rem;
-        background: #f8fafc;
-        padding: 0.9rem 1rem;
-      }
-      .selection-shell {
-        position: fixed;
-        top: 1rem;
-        right: 1rem;
-        z-index: 20;
-        width: min(24rem, calc(100vw - 2rem));
-        border-radius: 1.25rem;
-        border: 1px solid rgba(15, 23, 42, 0.14);
-        background: rgba(255, 255, 255, 0.92);
-        box-shadow: 0 24px 48px rgba(15, 23, 42, 0.14);
-        backdrop-filter: blur(14px);
-        padding: 1rem;
-      }
-      .selection-shell h2 {
-        margin: 0;
-        font-size: 1rem;
-      }
-      .selection-copy {
-        margin: 0.35rem 0 0.9rem;
-        color: #475569;
-        font-size: 0.92rem;
-      }
-      .selection-actions {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.5rem;
-      }
-      .selection-button {
-        border: 1px solid rgba(15, 23, 42, 0.14);
-        background: #f8fafc;
-        color: #0f172a;
-        border-radius: 999px;
-        padding: 0.55rem 0.9rem;
-      }
-      .selection-button-active {
-        border-color: rgba(15, 76, 129, 0.4);
-        background: #0f4c81;
-        color: white;
-      }
-      .selection-field {
-        display: grid;
-        gap: 0.45rem;
-        margin-top: 0.9rem;
-      }
-      .selection-field label {
-        font-size: 0.82rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
-      }
-      .selection-field input {
-        width: 100%;
-        border: 1px solid rgba(15, 23, 42, 0.14);
-        border-radius: 0.85rem;
-        padding: 0.7rem 0.9rem;
-        background: rgba(248, 250, 252, 0.92);
-      }
-      .selection-status {
-        margin: 0.9rem 0 0;
-        color: #334155;
-        font-size: 0.9rem;
-      }
-      .selection-highlight,
-      .selection-marquee {
-        position: fixed;
-        pointer-events: none;
-        z-index: 19;
-        border-radius: 1rem;
-      }
-      .selection-highlight {
-        border: 2px solid #0f4c81;
-        background: rgba(15, 76, 129, 0.08);
-        box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.08);
-        display: none;
-      }
-      .selection-marquee {
-        border: 2px dashed rgba(15, 76, 129, 0.8);
-        background: rgba(15, 76, 129, 0.12);
-        display: none;
-      }
-      .selection-label {
-        position: fixed;
-        z-index: 21;
-        pointer-events: none;
-        border-radius: 999px;
-        background: #0f172a;
-        color: white;
-        padding: 0.3rem 0.65rem;
-        font-size: 0.82rem;
-        display: none;
-      }
-      [data-selectable="true"] {
-        transition:
-          transform 120ms ease,
-          box-shadow 120ms ease,
-          outline-color 120ms ease;
-      }
-      [data-selectable="true"]:hover {
-        outline: 2px solid rgba(15, 76, 129, 0.55);
-        transform: translateY(-1px);
-      }
-      code {
-        padding: 0.1rem 0.35rem;
-        border-radius: 0.3rem;
-        background: rgba(15, 23, 42, 0.08);
-      }
-      @media (max-width: 900px) {
-        .selection-shell {
-          position: sticky;
-          top: 0;
-          right: auto;
-          width: 100%;
-        }
-        .page {
-          padding-top: 1rem;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <aside class="selection-shell" data-selection-ignore="true">
-      <h2>Selection overlay</h2>
-      <p class="selection-copy">Choose a mode, then click a target or drag a region. The note is attached to the next capture.</p>
-      <div class="selection-actions">
-        <button class="selection-button selection-button-active" id="mode-element" type="button">Element click</button>
-        <button class="selection-button" id="mode-area" type="button">Area drag</button>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenAI 스타일 챗봇 워크스페이스</title>
+  <meta name="description" content="OpenAI 스타일의 AI 챗봇 워크스페이스 데모 UI" />
+  <meta name="theme-color" content="#0b0f14" />
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#11161d;
+      --panel-2:#171d25;
+      --panel-3:#1d2530;
+      --border:rgba(255,255,255,0.08);
+      --muted:#93a1b4;
+      --text:#eef2f7;
+      --subtle:#c4cfdd;
+      --accent:#10a37f;
+      --accent-2:#19c37d;
+      --chip:#1a212b;
+      --hover:#212a36;
+      --user:#1b2430;
+      --assistant:#121820;
+      --shadow:0 10px 30px rgba(0,0,0,.35);
+      --radius-xl:24px;
+      --radius-lg:18px;
+      --radius-md:14px;
+      --radius-sm:10px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(16,163,127,.12), transparent 30%),
+        radial-gradient(circle at top right, rgba(77,124,255,.10), transparent 28%),
+        linear-gradient(180deg, #0a0e13 0%, #0b0f14 100%);
+      color:var(--text);
+      display:flex;
+      justify-content:center;
+      align-items:stretch;
+      padding:20px;
+    }
+    .app-shell{
+      width:min(1400px, 100%);
+      min-height:calc(100vh - 40px);
+      display:grid;
+      grid-template-columns: 280px 1fr;
+      background:rgba(255,255,255,0.02);
+      border:1px solid var(--border);
+      border-radius:28px;
+      overflow:hidden;
+      box-shadow:var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+    .sidebar{
+      background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.015));
+      border-right:1px solid var(--border);
+      padding:20px 16px;
+      display:flex;
+      flex-direction:column;
+      gap:18px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      padding:10px 12px;
+      border-radius:16px;
+    }
+    .logo{
+      width:36px;height:36px;border-radius:12px;
+      background:linear-gradient(135deg, #1fd1a5, #0f8f71);
+      display:grid;place-items:center;
+      color:white;font-weight:700;
+      box-shadow:0 8px 20px rgba(16,163,127,.28);
+    }
+    .brand h1{
+      margin:0;
+      font-size:15px;
+      font-weight:700;
+      letter-spacing:.1px;
+    }
+    .brand p{
+      margin:2px 0 0;
+      color:var(--muted);
+      font-size:12px;
+    }
+    .new-chat-btn{
+      width:100%;
+      border:none;
+      background:linear-gradient(135deg, var(--accent), var(--accent-2));
+      color:white;
+      padding:14px 16px;
+      border-radius:16px;
+      font-size:14px;
+      font-weight:700;
+      cursor:pointer;
+      transition:.2s ease;
+      box-shadow:0 10px 24px rgba(16,163,127,.22);
+    }
+    .new-chat-btn:hover{transform:translateY(-1px); filter:brightness(1.04)}
+    .new-chat-btn:active{transform:translateY(0)}
+    .sidebar-section-title{
+      font-size:11px;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+      color:var(--muted);
+      margin:4px 10px 0;
+    }
+    .history-list,.tool-list{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .history-item,.tool-item{
+      width:100%;
+      text-align:left;
+      background:transparent;
+      border:1px solid transparent;
+      color:var(--subtle);
+      padding:12px 14px;
+      border-radius:14px;
+      cursor:pointer;
+      transition:.18s ease;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .history-item:hover,.tool-item:hover{
+      background:var(--hover);
+      border-color:var(--border);
+      color:var(--text);
+    }
+    .history-item.active,.tool-item.active{
+      background:var(--panel-3);
+      border-color:rgba(255,255,255,.1);
+      color:var(--text);
+    }
+    .history-item .label,.tool-item .label{
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+      font-size:13px;
+    }
+    .history-item .meta,.tool-item .meta{
+      color:var(--muted);
+      font-size:11px;
+      flex-shrink:0;
+    }
+    .sidebar-footer{
+      margin-top:auto;
+      padding:14px;
+      border-radius:18px;
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
+      border:1px solid var(--border);
+    }
+    .sidebar-footer .plan{
+      font-size:13px;font-weight:700;margin-bottom:4px;
+    }
+    .sidebar-footer .desc{
+      font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;
+    }
+    .upgrade-btn{
+      width:100%;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      color:var(--text);
+      padding:11px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      transition:.18s ease;
+      font-weight:600;
+    }
+    .upgrade-btn:hover{background:var(--hover)}
+    .main{
+      display:flex;
+      flex-direction:column;
+      min-width:0;
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,0));
+    }
+    .topbar{
+      padding:18px 24px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:18px;
+      background:rgba(10,14,19,.45);
+      backdrop-filter: blur(10px);
+    }
+    .topbar-left{
+      display:flex;
+      align-items:center;
+      gap:14px;
+      min-width:0;
+    }
+    .workspace-title h2{
+      margin:0;
+      font-size:18px;
+      font-weight:700;
+    }
+    .workspace-title p{
+      margin:4px 0 0;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .tab-group{
+      display:flex;
+      gap:8px;
+      background:rgba(255,255,255,.03);
+      border:1px solid var(--border);
+      padding:6px;
+      border-radius:14px;
+    }
+    .tab{
+      border:none;
+      background:transparent;
+      color:var(--muted);
+      padding:10px 14px;
+      border-radius:10px;
+      cursor:pointer;
+      font-weight:600;
+      font-size:13px;
+      transition:.18s ease;
+    }
+    .tab.active{
+      background:var(--panel-2);
+      color:var(--text);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+    }
+    .topbar-right{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .ghost-btn,.icon-btn{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.03);
+      color:var(--text);
+      padding:11px 14px;
+      border-radius:12px;
+      cursor:pointer;
+      transition:.18s ease;
+      font-weight:600;
+    }
+    .icon-btn{width:42px;height:42px;padding:0;display:grid;place-items:center}
+    .ghost-btn:hover,.icon-btn:hover{background:var(--hover)}
+    .content{
+      flex:1;
+      min-height:0;
+      display:flex;
+      flex-direction:column;
+      padding:24px;
+      gap:20px;
+    }
+    .panel{
+      display:none;
+      flex-direction:column;
+      min-height:0;
+      height:100%;
+      gap:18px;
+    }
+    .panel.active{display:flex}
+    .hero-card{
+      border:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.02));
+      border-radius:var(--radius-xl);
+      padding:22px;
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:20px;
+    }
+    .hero-card h3{
+      margin:0 0 8px;
+      font-size:24px;
+      line-height:1.2;
+    }
+    .hero-card p{
+      margin:0;
+      color:var(--muted);
+      line-height:1.6;
+      max-width:720px;
+    }
+    .hero-badge{
+      padding:10px 12px;
+      border-radius:999px;
+      background:rgba(16,163,127,.12);
+      color:#7ce8c7;
+      border:1px solid rgba(16,163,127,.25);
+      font-size:12px;
+      font-weight:700;
+      white-space:nowrap;
+    }
+    .suggestions{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .chip{
+      border:1px solid var(--border);
+      background:var(--chip);
+      color:var(--text);
+      padding:12px 14px;
+      border-radius:999px;
+      cursor:pointer;
+      transition:.18s ease;
+      font-size:13px;
+      line-height:1;
+    }
+    .chip:hover{
+      background:var(--hover);
+      transform:translateY(-1px);
+    }
+    .chat-surface{
+      flex:1;
+      min-height:360px;
+      display:flex;
+      flex-direction:column;
+      border:1px solid var(--border);
+      border-radius:var(--radius-xl);
+      background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.015));
+      overflow:hidden;
+    }
+    .messages{
+      flex:1;
+      overflow:auto;
+      padding:24px;
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+      scroll-behavior:smooth;
+    }
+    .message{
+      display:flex;
+      gap:14px;
+      align-items:flex-start;
+      max-width:900px;
+      animation:fadeUp .24s ease;
+    }
+    .message.user{align-self:flex-end; flex-direction:row-reverse}
+    .avatar{
+      width:38px;height:38px;border-radius:14px;
+      display:grid;place-items:center;
+      font-weight:800;
+      flex-shrink:0;
+      border:1px solid var(--border);
+    }
+    .avatar.assistant{
+      background:linear-gradient(135deg, #12362d, #0f8f71);
+      color:white;
+    }
+    .avatar.user{
+      background:linear-gradient(135deg, #223043, #314862);
+      color:#fff;
+    }
+    .bubble{
+      padding:16px 18px;
+      border-radius:18px;
+      border:1px solid var(--border);
+      line-height:1.65;
+      font-size:14px;
+      color:var(--text);
+      background:var(--assistant);
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
+    }
+    .message.user .bubble{
+      background:var(--user);
+    }
+    .typing{
+      display:inline-flex;
+      gap:6px;
+      align-items:center;
+    }
+    .typing span{
+      width:7px;height:7px;border-radius:50%;
+      background:#7fb7a8;
+      opacity:.35;
+      animation:bounce 1.2s infinite;
+    }
+    .typing span:nth-child(2){animation-delay:.15s}
+    .typing span:nth-child(3){animation-delay:.3s}
+    .composer-wrap{
+      border-top:1px solid var(--border);
+      padding:18px;
+      background:rgba(0,0,0,.12);
+    }
+    .composer{
+      display:flex;
+      gap:12px;
+      align-items:flex-end;
+      background:var(--panel);
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:12px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.02);
+    }
+    .composer textarea{
+      flex:1;
+      resize:none;
+      border:none;
+      outline:none;
+      background:transparent;
+      color:var(--text);
+      font:inherit;
+      min-height:54px;
+      max-height:180px;
+      padding:10px 8px;
+      line-height:1.5;
+    }
+    .composer textarea::placeholder{color:#7f8a98}
+    .composer-actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .send-btn{
+      border:none;
+      background:linear-gradient(135deg, var(--accent), var(--accent-2));
+      color:white;
+      width:50px;height:50px;border-radius:16px;
+      cursor:pointer;
+      font-size:18px;
+      font-weight:700;
+      transition:.18s ease;
+      box-shadow:0 10px 24px rgba(16,163,127,.24);
+    }
+    .send-btn:hover{transform:translateY(-1px)}
+    .toolbar-note{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      margin-top:10px;
+      color:var(--muted);
+      font-size:12px;
+      padding:0 6px;
+    }
+    .insights-grid{
+      display:grid;
+      grid-template-columns:repeat(3, minmax(0, 1fr));
+      gap:16px;
+    }
+    .stat-card{
+      border:1px solid var(--border);
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.015));
+      border-radius:20px;
+      padding:20px;
+    }
+    .stat-card .eyebrow{
+      color:var(--muted);
+      font-size:12px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      margin-bottom:10px;
+    }
+    .stat-card .value{
+      font-size:30px;
+      font-weight:800;
+      margin-bottom:8px;
+    }
+    .stat-card .hint{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+    }
+    .activity-card{
+      border:1px solid var(--border);
+      background:var(--panel);
+      border-radius:22px;
+      padding:20px;
+      display:flex;
+      flex-direction:column;
+      gap:14px;
+    }
+    .activity-row{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:12px 0;
+      border-bottom:1px solid rgba(255,255,255,.05);
+    }
+    .activity-row:last-child{border-bottom:none}
+    .activity-row .left{
+      display:flex;flex-direction:column;gap:4px;
+    }
+    .activity-row .title{
+      font-size:14px;font-weight:600;
+    }
+    .activity-row .sub{
+      color:var(--muted);font-size:12px;
+    }
+    .badge{
+      font-size:11px;
+      font-weight:700;
+      padding:7px 10px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:var(--panel-2);
+      color:var(--subtle);
+    }
+    .toast{
+      position:fixed;
+      right:24px;
+      bottom:24px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      z-index:50;
+      pointer-events:none;
+    }
+    .toast-item{
+      min-width:240px;
+      max-width:340px;
+      background:#10161d;
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:14px 16px;
+      box-shadow:var(--shadow);
+      animation:toastIn .25s ease;
+    }
+    .toast-item .title{
+      font-size:13px;
+      font-weight:700;
+      margin-bottom:4px;
+    }
+    .toast-item .body{
+      font-size:12px;
+      color:var(--muted);
+      line-height:1.5;
+    }
+    @keyframes fadeUp{
+      from{opacity:0; transform:translateY(8px)}
+      to{opacity:1; transform:translateY(0)}
+    }
+    @keyframes bounce{
+      0%,80%,100%{transform:scale(.8); opacity:.35}
+      40%{transform:scale(1.1); opacity:1}
+    }
+    @keyframes toastIn{
+      from{opacity:0; transform:translateY(12px)}
+      to{opacity:1; transform:translateY(0)}
+    }
+    @media (max-width: 1080px){
+      .app-shell{grid-template-columns:1fr}
+      .sidebar{display:none}
+      .insights-grid{grid-template-columns:1fr}
+      .topbar{flex-direction:column; align-items:stretch}
+      .topbar-right{justify-content:flex-end}
+    }
+    @media (max-width: 720px){
+      body{padding:10px}
+      .content{padding:14px}
+      .hero-card{flex-direction:column}
+      .tab-group{width:100%; overflow:auto}
+      .message{max-width:100%}
+      .toolbar-note{flex-direction:column}
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">AI</div>
+        <div>
+          <h1>OpenAI Workspace</h1>
+          <p>Productive AI chat experience</p>
+        </div>
       </div>
-      <div class="selection-field">
-        <label for="selection-note">Selection note</label>
-        <input id="selection-note" placeholder="Example: tighten padding but keep CTA hierarchy" type="text" />
+
+      <button class="new-chat-btn" id="sidebarNewChat">＋ 새 대화</button>
+
+      <div>
+        <div class="sidebar-section-title">최근 대화</div>
+        <div class="history-list" id="historyList">
+          <button class="history-item active">
+            <span class="label">제품 소개 페이지 초안 만들기</span>
+            <span class="meta">방금 전</span>
+          </button>
+          <button class="history-item">
+            <span class="label">마케팅 카피 5개 제안</span>
+            <span class="meta">오늘</span>
+          </button>
+          <button class="history-item">
+            <span class="label">프론트엔드 리팩토링 전략</span>
+            <span class="meta">어제</span>
+          </button>
+        </div>
       </div>
-      <p class="selection-status" id="selection-status">Waiting for a selection capture.</p>
+
+      <div>
+        <div class="sidebar-section-title">워크플로우</div>
+        <div class="tool-list">
+          <button class="tool-item active" data-action="mode-chat">
+            <span class="label">대화 모드</span>
+            <span class="meta">Live</span>
+          </button>
+          <button class="tool-item" data-action="mode-code">
+            <span class="label">코드 생성</span>
+            <span class="meta">Demo</span>
+          </button>
+          <button class="tool-item" data-action="mode-analyze">
+            <span class="label">문서 분석</span>
+            <span class="meta">Demo</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="plan">Pro Workspace</div>
+        <div class="desc">더 긴 컨텍스트, 빠른 응답, 팀 협업용 기능을 체험해보세요.</div>
+        <button class="upgrade-btn" id="upgradeBtn">업그레이드 보기</button>
+      </div>
     </aside>
 
-    <div class="selection-highlight" id="selection-highlight"></div>
-    <div class="selection-marquee" id="selection-marquee"></div>
-    <div class="selection-label" id="selection-label"></div>
+    <main class="main">
+      <!-- @lfg-region:Header -->
+<div data-lfg-component="Header" class="topbar">
+  <div class="topbar-left">
+    <div class="workspace-title">
+      <h2>Open AI</h2>
+      <p>질문, 작성, 요약, 아이디어 확장을 한 곳에서</p>
+    </div>
+    <div class="tab-group" id="tabGroup">
+      <button class="tab active" data-tab="chat">Chat</button>
+      <button class="tab" data-tab="insights">Insights</button>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <button class="ghost-btn" id="shareBtn">공유</button>
+    <button class="ghost-btn" id="exportBtn">내보내기</button>
+    <button class="icon-btn" id="themeBtn" title="테마 토글">☼</button>
+  </div>
+</div>
+<!-- @lfg-region-end:Header -->
 
-    <main class="page">
-      <section
-        class="hero"
-        data-component-hint="GeneratedPreviewHero"
-        data-export-name="GeneratedPreviewHero"
-        data-selectable="true"
-        data-selection-id="hero"
-        data-source-file="preview/index.html"
-      >
-        <h1>Generated Runtime Preview</h1>
-        <p>
-          The runtime serves the mounted <code>workspace/</code> volume and exposes a live iframe bridge back to the operator shell.
-          This preview now captures element or region selection payloads for targeted edits.
-        </p>
-      </section>
+      <!-- @lfg-region:Content -->
+      <div data-lfg-component="Content" class="content">
+        <section class="panel active" id="panel-chat">
+          <div class="hero-card">
+            <div>
+              <h3>무엇을 도와드릴까요?</h3>
+              <p>OpenAI 스타일의 깔끔한 챗봇 워크스페이스입니다. 빠른 제안 버튼을 누르거나 메시지를 입력하면 데모 응답이 즉시 생성됩니다.</p>
+            </div>
+            <div class="hero-badge" id="statusBadge">GPT-style Demo Ready</div>
+          </div>
 
-      <section
-        class="panel"
-        data-component-hint="RuntimeStatusPanel"
-        data-export-name="RuntimeStatusPanel"
-        data-selectable="true"
-        data-selection-id="runtime-status-panel"
-        data-source-file="preview/index.html"
-      >
-        <h2>Runtime status</h2>
-        <div class="grid">
-          <div
-            class="metric"
-            data-component-hint="PreviewOriginMetric"
-            data-export-name="PreviewOriginMetric"
-            data-selectable="true"
-            data-selection-id="preview-origin-metric"
-            data-source-file="preview/index.html"
-          >
-            <strong>Preview origin</strong>
-            <span id="preview-origin">loading</span>
+          <div class="suggestions" id="suggestions">
+            <button class="chip">신규 SaaS 제품 소개 문구 작성해줘</button>
+            <button class="chip">회의록을 5줄로 요약해줘</button>
+            <button class="chip">React 컴포넌트 구조 추천해줘</button>
+            <button class="chip">마케팅 이메일 초안 작성해줘</button>
           </div>
-          <div
-            class="metric"
-            data-component-hint="BuildIdMetric"
-            data-export-name="BuildIdMetric"
-            data-selectable="true"
-            data-selection-id="build-id-metric"
-            data-source-file="preview/index.html"
-          >
-            <strong>Build ID</strong>
-            <span id="build-id">loading</span>
-          </div>
-          <div
-            class="metric"
-            data-component-hint="RuntimeHealthMetric"
-            data-export-name="RuntimeHealthMetric"
-            data-selectable="true"
-            data-selection-id="runtime-health-metric"
-            data-source-file="preview/index.html"
-          >
-            <strong>Runtime status</strong>
-            <span id="runtime-status">starting</span>
-          </div>
-        </div>
-      </section>
 
-      <section
-        class="panel"
-        data-component-hint="BridgeEventsPanel"
-        data-export-name="BridgeEventsPanel"
-        data-selectable="true"
-        data-selection-id="bridge-events-panel"
-        data-source-file="preview/index.html"
-      >
-        <h2>Bridge events</h2>
-        <div class="bridge">
-          <div
-            class="bridge-row"
-            data-component-hint="ParentConnectionRow"
-            data-export-name="ParentConnectionRow"
-            data-selectable="true"
-            data-selection-id="parent-connection-row"
-            data-source-file="preview/index.html"
-          >
-            <strong>Parent connection</strong>
-            <span id="parent-connection">Waiting for host</span>
+          <div class="chat-surface">
+            <div class="messages" id="messages">
+              <div class="message">
+                <div class="avatar assistant">AI</div>
+                <div class="bubble">
+                  안녕하세요. 제품 기획, 글쓰기, 코딩, 요약까지 도와드릴 수 있어요. 아래 제안 버튼을 누르거나 직접 질문해보세요.
+                </div>
+              </div>
+            </div>
+
+            <div class="composer-wrap">
+              <div class="composer">
+                <textarea id="chatInput" placeholder="메시지를 입력하세요. Enter 전송 / Shift+Enter 줄바꿈"></textarea>
+                <div class="composer-actions">
+                  <button class="icon-btn" id="attachBtn" title="파일 첨부">＋</button>
+                  <button class="send-btn" id="sendBtn" title="전송">↑</button>
+                </div>
+              </div>
+              <div class="toolbar-note">
+                <span id="composerHint">데모: 입력하면 AI 응답이 자동 생성됩니다.</span>
+                <span id="messageCount">메시지 1개</span>
+              </div>
+            </div>
           </div>
-          <div
-            class="bridge-row"
-            data-component-hint="LastEventRow"
-            data-export-name="LastEventRow"
-            data-selectable="true"
-            data-selection-id="last-event-row"
-            data-source-file="preview/index.html"
-          >
-            <strong>Last event</strong>
-            <span id="last-event">runtime boot</span>
+        </section>
+
+        <section class="panel" id="panel-insights">
+          <div class="hero-card">
+            <div>
+              <h3>대화 인사이트</h3>
+              <p>현재 워크스페이스의 사용 흐름과 예시 메트릭을 시각적으로 보여주는 데모 패널입니다. 상단 탭을 눌러 화면을 전환할 수 있습니다.</p>
+            </div>
+            <div class="hero-badge">Workspace Analytics</div>
           </div>
-        </div>
-      </section>
+
+          <div class="insights-grid">
+            <div class="stat-card">
+              <div class="eyebrow">총 프롬프트</div>
+              <div class="value" id="statPrompts">1</div>
+              <div class="hint">이번 세션에서 전송된 사용자 요청 수입니다.</div>
+            </div>
+            <div class="stat-card">
+              <div class="eyebrow">평균 응답 시간</div>
+              <div class="value" id="statLatency">0.8s</div>
+              <div class="hint">데모 응답 생성에 걸리는 평균 시간입니다.</div>
+            </div>
+            <div class="stat-card">
+              <div class="eyebrow">활성 모드</div>
+              <div class="value" id="statMode">대화</div>
+              <div class="hint">사이드바에서 선택한 워크플로우 모드를 반영합니다.</div>
+            </div>
+          </div>
+
+          <div class="activity-card" id="activityCard">
+            <div class="activity-row">
+              <div class="left">
+                <div class="title">세션 시작</div>
+                <div class="sub">AI assistant가 준비되었습니다.</div>
+              </div>
+              <div class="badge">Ready</div>
+            </div>
+            <div class="activity-row">
+              <div class="left">
+                <div class="title">예시 질문 안내</div>
+                <div class="sub">추천 칩 또는 자유 입력으로 시작할 수 있습니다.</div>
+              </div>
+              <div class="badge">Hint</div>
+            </div>
+          </div>
+        </section>
+      </div>
+      <!-- @lfg-region-end:Content -->
     </main>
+  </div>
 
-    <script>
-      const bridgeVersion = "2026-03-19";
-      const previewPath = "/preview";
-      const parentConnection = document.getElementById("parent-connection");
-      const lastEvent = document.getElementById("last-event");
-      const previewOrigin = document.getElementById("preview-origin");
-      const buildId = document.getElementById("build-id");
-      const runtimeStatus = document.getElementById("runtime-status");
-      const parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
-      const selectionHighlight = document.getElementById("selection-highlight");
-      const selectionMarquee = document.getElementById("selection-marquee");
-      const selectionLabel = document.getElementById("selection-label");
-      const selectionStatus = document.getElementById("selection-status");
-      const selectionNoteInput = document.getElementById("selection-note");
-      const elementModeButton = document.getElementById("mode-element");
-      const areaModeButton = document.getElementById("mode-area");
-      const selectionState = {
-        activeSelection: null,
-        draftNote: "",
-        mode: "element",
-        sessionId: "session-preview",
-        dragOrigin: null,
-      };
+  <div class="toast" id="toastContainer"></div>
 
-      previewOrigin.textContent = window.location.origin;
+  <script>
+    const messagesEl = document.getElementById('messages');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const attachBtn = document.getElementById('attachBtn');
+    const sidebarNewChat = document.getElementById('sidebarNewChat');
+    const suggestions = document.querySelectorAll('.chip');
+    const tabs = document.querySelectorAll('.tab');
+    const panels = {
+      chat: document.getElementById('panel-chat'),
+      insights: document.getElementById('panel-insights')
+    };
+    const toastContainer = document.getElementById('toastContainer');
+    const messageCountEl = document.getElementById('messageCount');
+    const statPrompts = document.getElementById('statPrompts');
+    const statMode = document.getElementById('statMode');
+    const activityCard = document.getElementById('activityCard');
+    const statusBadge = document.getElementById('statusBadge');
+    const themeBtn = document.getElementById('themeBtn');
+    const shareBtn = document.getElementById('shareBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const upgradeBtn = document.getElementById('upgradeBtn');
+    const historyItems = document.querySelectorAll('.history-item');
+    const toolItems = document.querySelectorAll('.tool-item');
 
-      function postToParent(type, payload) {
-        const targetOrigin = parentOrigin ?? "*";
-        window.parent.postMessage(
-          {
-            version: bridgeVersion,
-            source: "runtime",
-            type,
-            payload,
-          },
-          targetOrigin,
-        );
+    let userPromptCount = 0;
+    let darkMode = true;
+    let currentMode = '대화';
+
+    function showToast(title, body){
+      const item = document.createElement('div');
+      item.className = 'toast-item';
+      item.innerHTML = '<div class="title">'+title+'</div><div class="body">'+body+'</div>';
+      toastContainer.appendChild(item);
+      setTimeout(() => {
+        item.style.opacity = '0';
+        item.style.transform = 'translateY(8px)';
+        item.style.transition = '.2s ease';
+      }, 2600);
+      setTimeout(() => item.remove(), 3000);
+    }
+
+    function autoResize(){
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
+    }
+
+    function updateCounts(){
+      const total = messagesEl.querySelectorAll('.message').length;
+      messageCountEl.textContent = '메시지 ' + total + '개';
+      statPrompts.textContent = String(Math.max(userPromptCount, 1));
+    }
+
+    function scrollToBottom(){
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function addMessage(role, content, isHTML = false){
+      const wrap = document.createElement('div');
+      wrap.className = 'message' + (role === 'user' ? ' user' : '');
+      wrap.innerHTML = `
+        <div class="avatar ${role}">${role === 'user' ? '나' : 'AI'}</div>
+        <div class="bubble"></div>
+      `;
+      const bubble = wrap.querySelector('.bubble');
+      if(isHTML) bubble.innerHTML = content;
+      else bubble.textContent = content;
+      messagesEl.appendChild(wrap);
+      updateCounts();
+      scrollToBottom();
+      return wrap;
+    }
+
+    function addActivity(title, sub, badge){
+      const row = document.createElement('div');
+      row.className = 'activity-row';
+      row.innerHTML = `
+        <div class="left">
+          <div class="title">${title}</div>
+          <div class="sub">${sub}</div>
+        </div>
+        <div class="badge">${badge}</div>
+      `;
+      activityCard.prepend(row);
+    }
+
+    function generateResponse(input){
+      const text = input.toLowerCase();
+      if(text.includes('요약')){
+        return '핵심만 요약해드리면: 1) 주요 목표를 명확히 설정하고, 2) 사용자 가치 중심으로 메시지를 정리하며, 3) 실행 항목을 우선순위로 나누는 것이 좋습니다.';
       }
-
-      function collapseText(value) {
-        return value.replace(/\s+/g, " ").trim().slice(0, 160);
+      if(text.includes('react') || text.includes('컴포넌트') || text.includes('코드')){
+        return '추천 구조는 다음과 같습니다: AppShell, Sidebar, ChatHeader, MessageList, Composer로 분리하세요. 상태는 상위에서 관리하고 메시지 렌더링은 독립 컴포넌트로 유지하면 확장성이 좋습니다.';
       }
-
-      function rectToBounds(rect) {
-        return {
-          x: Math.round(rect.left),
-          y: Math.round(rect.top),
-          width: Math.round(rect.width),
-          height: Math.round(rect.height),
-        };
+      if(text.includes('마케팅') || text.includes('이메일') || text.includes('소개')){
+        return '예시 초안: "안녕하세요, 더 빠르고 똑똑한 팀 워크플로우를 위한 새로운 AI 도우미를 소개합니다. 반복 작업은 줄이고, 중요한 결정은 더 빠르게 내리세요." 원하시면 톤을 더 세련되게 다듬어드릴게요.';
       }
+      return '좋은 질문입니다. 이 데모에서는 입력 내용을 바탕으로 자연스러운 응답을 생성합니다. 원하시면 더 구체적인 형식(요약, 목록, 코드, 카피라이팅)으로 다시 답변해드릴 수 있어요.';
+    }
 
-      function buildDomPath(element) {
-        const path = [];
-        let current = element;
+    function simulateAIResponse(input){
+      const typing = addMessage('assistant', '<span class="typing"><span></span><span></span><span></span></span>', true);
+      statusBadge.textContent = 'Thinking...';
+      setTimeout(() => {
+        typing.remove();
+        addMessage('assistant', generateResponse(input));
+        statusBadge.textContent = 'GPT-style Demo Ready';
+        addActivity('새 응답 생성', '"' + input.slice(0, 32) + (input.length > 32 ? '...' : '') + '" 요청에 대한 답변이 생성되었습니다.', 'Done');
+      }, 900);
+    }
 
-        while (current && current.nodeType === Node.ELEMENT_NODE && current !== document.body) {
-          const selectionId = current.dataset.selectionId;
-          if (selectionId) {
-            path.unshift(`[data-selection-id="${selectionId}"]`);
-          } else {
-            const parent = current.parentElement;
-            const siblings = parent ? Array.from(parent.children).filter((child) => child.tagName === current.tagName) : [];
-            const siblingIndex = siblings.indexOf(current) + 1;
-            path.unshift(`${current.tagName.toLowerCase()}:nth-of-type(${Math.max(1, siblingIndex)})`);
-          }
-          current = current.parentElement;
-        }
-
-        path.unshift("body");
-        return path;
+    function sendMessage(text){
+      const value = (text || chatInput.value).trim();
+      if(!value){
+        showToast('입력이 필요합니다', '메시지를 입력하거나 추천 칩을 눌러보세요.');
+        return;
       }
+      addMessage('user', value);
+      userPromptCount += 1;
+      updateCounts();
+      chatInput.value = '';
+      autoResize();
+      simulateAIResponse(value);
+    }
 
-      function inferComponentHint(element) {
-        if (element.dataset.componentHint) {
-          return element.dataset.componentHint;
-        }
-        if (element.id) {
-          return element.id;
-        }
-        const firstClass = Array.from(element.classList)[0];
-        if (firstClass) {
-          return firstClass;
-        }
-        return element.tagName.toLowerCase();
+    function resetChat(){
+      messagesEl.innerHTML = `
+        <div class="message">
+          <div class="avatar assistant">AI</div>
+          <div class="bubble">
+            새로운 대화가 시작되었습니다. 아이디어 정리, 글쓰기, 요약, 코드 생성 등 무엇이든 요청해보세요.
+          </div>
+        </div>
+      `;
+      userPromptCount = 0;
+      updateCounts();
+      addActivity('새 대화 시작', '기존 메시지가 정리되고 새로운 세션이 시작되었습니다.', 'New');
+      showToast('새 대화', '현재 대화가 초기화되었습니다.');
+      statusBadge.textContent = 'Fresh Session';
+      setTimeout(() => statusBadge.textContent = 'GPT-style Demo Ready', 1500);
+    }
+
+    sendBtn.addEventListener('click', () => sendMessage());
+
+    chatInput.addEventListener('input', autoResize);
+    chatInput.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' && !e.shiftKey){
+        e.preventDefault();
+        sendMessage();
       }
+    });
 
-      function buildSelector(element) {
-        if (element.dataset.selectionId) {
-          return `[data-selection-id="${element.dataset.selectionId}"]`;
-        }
-        if (element.id) {
-          return `#${element.id}`;
-        }
-        return `${element.tagName.toLowerCase()}.${Array.from(element.classList).join(".")}`.replace(/\.$/, "");
-      }
+    attachBtn.addEventListener('click', () => {
+      showToast('첨부 데모', '실제 업로드 대신 "문서가 첨부된 것처럼" 상태를 표시합니다.');
+      chatInput.value = '첨부된 문서를 요약해줘';
+      autoResize();
+      chatInput.focus();
+    });
 
-      function buildSourceHint(element) {
-        const filePath = element.dataset.sourceFile;
-        const exportName = element.dataset.exportName || inferComponentHint(element);
-        const line = Number(element.dataset.sourceLine || 0) || undefined;
-        if (!filePath && !exportName && !line) {
-          return undefined;
-        }
-        return {
-          filePath,
-          exportName,
-          line,
-        };
-      }
+    sidebarNewChat.addEventListener('click', resetChat);
 
-      function updateSelectionOverlay(bounds, label) {
-        selectionHighlight.style.display = "block";
-        selectionHighlight.style.left = `${bounds.x}px`;
-        selectionHighlight.style.top = `${bounds.y}px`;
-        selectionHighlight.style.width = `${bounds.width}px`;
-        selectionHighlight.style.height = `${bounds.height}px`;
-        selectionLabel.style.display = "block";
-        selectionLabel.textContent = label;
-        selectionLabel.style.left = `${bounds.x}px`;
-        selectionLabel.style.top = `${Math.max(10, bounds.y - 34)}px`;
-      }
-
-      function clearMarquee() {
-        selectionMarquee.style.display = "none";
-      }
-
-      function setMode(mode) {
-        selectionState.mode = mode;
-        elementModeButton.classList.toggle("selection-button-active", mode === "element");
-        areaModeButton.classList.toggle("selection-button-active", mode === "area");
-        selectionStatus.textContent = mode === "element" ? "Click a preview element to capture it." : "Drag across the preview to capture an area.";
-      }
-
-      function findSelectableElement(node) {
-        if (!(node instanceof Element)) {
-          return null;
-        }
-        return node.closest("[data-selectable='true']");
-      }
-
-      function emitSelection(payload) {
-        selectionState.activeSelection = payload;
-        updateSelectionOverlay(payload.bounds, `${payload.kind} • ${payload.componentHint || payload.selector}`);
-        selectionStatus.textContent = `${payload.kind} captured: ${payload.selector}`;
-        postToParent("selection.changed", payload);
-      }
-
-      function buildElementSelection(element) {
-        const rect = element.getBoundingClientRect();
-        return {
-          id: `selection-${crypto.randomUUID()}`,
-          sessionId: selectionState.sessionId,
-          kind: "element",
-          selector: buildSelector(element),
-          domPath: buildDomPath(element),
-          textSnippet: collapseText(element.textContent || ""),
-          bounds: rectToBounds(rect),
-          note: selectionState.draftNote || "",
-          componentHint: inferComponentHint(element),
-          sourceHint: buildSourceHint(element),
-          capturedAt: new Date().toISOString(),
-        };
-      }
-
-      function intersects(a, b) {
-        return !(a.right < b.left || a.left > b.right || a.bottom < b.top || a.top > b.bottom);
-      }
-
-      function commonDomPath(elements) {
-        const paths = elements.map((element) => buildDomPath(element));
-        const shortest = Math.min(...paths.map((path) => path.length));
-        const shared = [];
-        for (let index = 0; index < shortest; index += 1) {
-          const segment = paths[0][index];
-          if (paths.every((path) => path[index] === segment)) {
-            shared.push(segment);
-          } else {
-            break;
-          }
-        }
-        return shared.length > 0 ? shared : ["body"];
-      }
-
-      function buildAreaSelection(rect) {
-        const selectionRect = {
-          left: rect.x,
-          top: rect.y,
-          right: rect.x + rect.width,
-          bottom: rect.y + rect.height,
-        };
-        const selectableElements = Array.from(document.querySelectorAll("[data-selectable='true']")).filter((element) =>
-          intersects(selectionRect, element.getBoundingClientRect()),
-        );
-        const textSnippet = collapseText(selectableElements.map((element) => element.textContent || "").join(" "));
-        const firstTarget = selectableElements[0];
-
-        return {
-          id: `selection-${crypto.randomUUID()}`,
-          sessionId: selectionState.sessionId,
-          kind: "area",
-          selector: `area(${rect.x},${rect.y},${rect.width},${rect.height})`,
-          domPath: selectableElements.length > 0 ? commonDomPath(selectableElements) : ["body"],
-          textSnippet,
-          bounds: rect,
-          note: selectionState.draftNote || "",
-          componentHint: firstTarget ? inferComponentHint(firstTarget) : "RegionSelection",
-          sourceHint: firstTarget ? buildSourceHint(firstTarget) : { filePath: "preview/index.html", exportName: "RegionSelection" },
-          capturedAt: new Date().toISOString(),
-        };
-      }
-
-      async function fetchHealth() {
-        const response = await fetch("/health", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Runtime health request failed");
-        }
-        return response.json();
-      }
-
-      async function publishHealth(eventType) {
-        const health = await fetchHealth();
-        buildId.textContent = health.buildId;
-        runtimeStatus.textContent = health.status;
-        postToParent(eventType, eventType === "runtime.ready" ? { health, previewPath } : health);
-        return health;
-      }
-
-      selectionNoteInput.addEventListener("input", (event) => {
-        selectionState.draftNote = event.target.value.trim();
+    suggestions.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chatInput.value = chip.textContent;
+        autoResize();
+        sendMessage(chip.textContent);
       });
+    });
 
-      elementModeButton.addEventListener("click", () => setMode("element"));
-      areaModeButton.addEventListener("click", () => setMode("area"));
-
-      window.addEventListener("pointerdown", (event) => {
-        const target = event.target instanceof Element ? event.target : null;
-        if (event.button !== 0 || target?.closest("[data-selection-ignore='true']")) {
-          return;
-        }
-
-        if (selectionState.mode === "element") {
-          const selectableTarget = findSelectableElement(target);
-          if (!selectableTarget) {
-            return;
-          }
-          event.preventDefault();
-          emitSelection(buildElementSelection(selectableTarget));
-          return;
-        }
-
-        selectionState.dragOrigin = { x: event.clientX, y: event.clientY };
-        selectionMarquee.style.display = "block";
-        selectionMarquee.style.left = `${event.clientX}px`;
-        selectionMarquee.style.top = `${event.clientY}px`;
-        selectionMarquee.style.width = "0px";
-        selectionMarquee.style.height = "0px";
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        tabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        const key = tab.dataset.tab;
+        Object.values(panels).forEach(panel => panel.classList.remove('active'));
+        panels[key].classList.add('active');
+        showToast('탭 전환', key === 'chat' ? 'Chat 화면으로 이동했습니다.' : 'Insights 화면으로 이동했습니다.');
       });
+    });
 
-      window.addEventListener("pointermove", (event) => {
-        if (selectionState.mode !== "area" || !selectionState.dragOrigin) {
-          return;
-        }
+    shareBtn.addEventListener('click', () => {
+      showToast('공유 링크 생성', '데모 링크가 클립보드에 복사된 것처럼 처리되었습니다.');
+      addActivity('공유 실행', '현재 워크스페이스를 공유하는 동작이 실행되었습니다.', 'Share');
+    });
 
-        const x = Math.min(selectionState.dragOrigin.x, event.clientX);
-        const y = Math.min(selectionState.dragOrigin.y, event.clientY);
-        const width = Math.abs(selectionState.dragOrigin.x - event.clientX);
-        const height = Math.abs(selectionState.dragOrigin.y - event.clientY);
-        selectionMarquee.style.left = `${x}px`;
-        selectionMarquee.style.top = `${y}px`;
-        selectionMarquee.style.width = `${width}px`;
-        selectionMarquee.style.height = `${height}px`;
-      });
+    exportBtn.addEventListener('click', () => {
+      showToast('내보내기 완료', '대화 내용이 요약 파일로 내보내진 것처럼 처리되었습니다.');
+      addActivity('내보내기 실행', '현재 대화 세션이 내보내기되었습니다.', 'Export');
+    });
 
-      window.addEventListener("pointerup", (event) => {
-        if (selectionState.mode !== "area" || !selectionState.dragOrigin) {
-          return;
-        }
+    upgradeBtn.addEventListener('click', () => {
+      showToast('업그레이드 안내', 'Pro 플랜 기능 소개 패널이 열렸다고 가정한 데모입니다.');
+    });
 
-        const x = Math.min(selectionState.dragOrigin.x, event.clientX);
-        const y = Math.min(selectionState.dragOrigin.y, event.clientY);
-        const width = Math.abs(selectionState.dragOrigin.x - event.clientX);
-        const height = Math.abs(selectionState.dragOrigin.y - event.clientY);
-        selectionState.dragOrigin = null;
-        clearMarquee();
-
-        if (width < 12 || height < 12) {
-          selectionStatus.textContent = "Area selection ignored because the drag region was too small.";
-          return;
-        }
-
-        emitSelection(
-          buildAreaSelection({
-            x: Math.round(x),
-            y: Math.round(y),
-            width: Math.round(width),
-            height: Math.round(height),
-          }),
-        );
-      });
-
-      window.addEventListener("message", async (event) => {
-        if (parentOrigin && event.origin !== parentOrigin) {
-          return;
-        }
-
-        const data = event.data;
-        if (!data || data.version !== bridgeVersion || data.source !== "web") {
-          return;
-        }
-
-        if (data.type === "host.ready") {
-          selectionState.sessionId = data.payload.sessionId || selectionState.sessionId;
-          parentConnection.textContent = "Connected to " + event.origin;
-          lastEvent.textContent = "host.ready";
-          await publishHealth("runtime.ready");
-          return;
-        }
-
-        if (data.type === "runtime.ping") {
-          lastEvent.textContent = "runtime.ping";
-          await publishHealth("runtime.health");
-          return;
-        }
-
-        if (data.type === "runtime.reload") {
-          lastEvent.textContent = "runtime.reload (" + data.payload.reason + ")";
-          postToParent("runtime.reloaded", {
-            reason: data.payload.reason,
-            reloadedAt: new Date().toISOString(),
-          });
-          window.location.reload();
+    historyItems.forEach((item, index) => {
+      item.addEventListener('click', () => {
+        historyItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        const label = item.querySelector('.label').textContent;
+        showToast('대화 불러오기', '"' + label + '" 대화가 선택되었습니다.');
+        if(index !== 0){
+          resetChat();
+          setTimeout(() => {
+            addMessage('user', label);
+            simulateAIResponse(label);
+          }, 200);
         }
       });
+    });
 
-      setMode("element");
-      publishHealth("runtime.ready").catch((error) => {
-        runtimeStatus.textContent = "error";
-        lastEvent.textContent = error.message;
+    toolItems.forEach(item => {
+      item.addEventListener('click', () => {
+        toolItems.forEach(i => i.classList.remove('active'));
+        item.classList.add('active');
+        currentMode = item.querySelector('.label').textContent.replace(' 모드','');
+        statMode.textContent = currentMode;
+        showToast('모드 변경', currentMode + ' 워크플로우로 전환되었습니다.');
+        addActivity('모드 전환', currentMode + ' 중심의 도우미 상태로 변경되었습니다.', 'Mode');
       });
-      window.setInterval(() => {
-        publishHealth("runtime.health").catch((error) => {
-          runtimeStatus.textContent = "error";
-          lastEvent.textContent = error.message;
-        });
-      }, 15000);
-    </script>
-  </body>
+    });
+
+    themeBtn.addEventListener('click', () => {
+      darkMode = !darkMode;
+      if(!darkMode){
+        document.documentElement.style.setProperty('--bg', '#f4f7fb');
+        document.documentElement.style.setProperty('--panel', '#ffffff');
+        document.documentElement.style.setProperty('--panel-2', '#f5f7fb');
+        document.documentElement.style.setProperty('--panel-3', '#eef3f9');
+        document.documentElement.style.setProperty('--border', 'rgba(15,23,42,0.08)');
+        document.documentElement.style.setProperty('--muted', '#607086');
+        document.documentElement.style.setProperty('--text', '#0f172a');
+        document.documentElement.style.setProperty('--subtle', '#334155');
+        document.documentElement.style.setProperty('--chip', '#f3f6fb');
+        document.documentElement.style.setProperty('--hover', '#eaf0f7');
+        document.documentElement.style.setProperty('--user', '#eaf1fb');
+        document.documentElement.style.setProperty('--assistant', '#ffffff');
+        document.body.style.background = 'linear-gradient(180deg, #eef4fb 0%, #f8fbff 100%)';
+        themeBtn.textContent = '☾';
+        showToast('라이트 테마', '밝은 테마로 전환되었습니다.');
+      } else {
+        location.reload();
+      }
+    });
+
+    updateCounts();
+    autoResize();
+  </script>
+</body>
 </html>

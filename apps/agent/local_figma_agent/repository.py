@@ -12,6 +12,7 @@ from psycopg.rows import dict_row
 from .models import (
     LlmProviderConfig,
     MemorySnapshot,
+    PatchRecord,
     ProjectFile,
     ProjectManifest,
     RuntimeHealth,
@@ -143,6 +144,37 @@ class SessionRepository:
                 where id = %s
                 """,
                 (summary, json.dumps(design_intent), session_id),
+            )
+            conn.commit()
+
+    def persist_patch_record(self, session_id: str, record: PatchRecord) -> None:
+        """Save a PatchRecord to the database."""
+        if not self.database_url:
+            return
+
+        plan_data = {"id": record.planId, "sessionId": session_id}
+        files_json = json.dumps(record.filesChanged)
+        with self._connect() as conn, conn.cursor() as cur:
+            cur.execute(
+                """
+                insert into patch_records (id, session_id, patch_plan, plan_id, status, files, files_changed, summary)
+                values (%s, %s, %s::jsonb, %s, %s, %s::jsonb, %s::jsonb, %s)
+                on conflict (id) do update
+                set status = excluded.status,
+                    files = excluded.files,
+                    files_changed = excluded.files_changed,
+                    summary = excluded.summary
+                """,
+                (
+                    record.id,
+                    session_id,
+                    json.dumps(plan_data),
+                    record.planId,
+                    record.status,
+                    files_json,
+                    files_json,
+                    record.summary,
+                ),
             )
             conn.commit()
 

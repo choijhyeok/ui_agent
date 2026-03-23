@@ -1,7 +1,11 @@
 import http from "node:http";
-import { createReadStream, existsSync } from "node:fs";
-import { stat } from "node:fs/promises";
-import { extname, join, normalize, resolve } from "node:path";
+import { createReadStream, existsSync, readFileSync } from "node:fs";
+import { stat, readFile } from "node:fs/promises";
+import { extname, join, normalize, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const overlayScript = readFileSync(join(__dirname, "selection-overlay.js"), "utf-8");
 
 const port = Number(process.env.RUNTIME_PORT ?? 3001);
 const projectId = process.env.RUNTIME_PROJECT_ID ?? "local-figma-preview";
@@ -70,11 +74,30 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    // Read the HTML
+    const html = await readFile(entryPath, "utf-8");
+    const isDemo = requestUrl.searchParams.get("demo") === "1";
+    let output;
+
+    if (isDemo) {
+      // Demo mode: serve raw HTML without selection overlay
+      output = html;
+    } else {
+      // Editor mode: inject selection overlay script before </body>
+      const injected = `<script data-lfg-overlay="true">\n${overlayScript}\n</script>`;
+      if (html.includes("</body>")) {
+        output = html.replace("</body>", `${injected}\n</body>`);
+      } else {
+        output = html + "\n" + injected;
+      }
+    }
+
     res.writeHead(200, {
       "cache-control": "no-store",
       "content-type": "text/html; charset=utf-8",
+      "content-length": Buffer.byteLength(output),
     });
-    createReadStream(entryPath).pipe(res);
+    res.end(output);
     return;
   }
 

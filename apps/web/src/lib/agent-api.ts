@@ -25,6 +25,21 @@ type AgentMemorySnapshot = {
 export type OrchestrationResponse = {
   response: string;
   patchPlan: PatchPlan;
+  patchRecord?: {
+    id: string;
+    sessionId: string;
+    planId: string;
+    status: "planned" | "applied" | "failed" | "rolled-back";
+    filesChanged: string[];
+    summary: string;
+    createdAt: string;
+  } | null;
+  patchValidation?: {
+    ok: boolean;
+    errors: string[];
+    warnings: string[];
+  } | null;
+  filesWritten?: string[];
   runtimeStatus: RuntimeHealth;
 };
 

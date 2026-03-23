@@ -422,3 +422,85 @@ class PostgresRepository:
             "selectedElements": self.list_selected_elements(session_id),
             "patchRecords": self.list_patch_records(session_id),
         }
+
+    # ── snapshots ───────────────────────────────────────────────────────────
+
+    def create_snapshot(
+        self,
+        snapshot_id: str,
+        session_id: str,
+        label: str,
+        archive: bytes,
+        file_list: list[str],
+        patch_record_id: str | None = None,
+    ) -> None:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    insert into snapshots (id, session_id, label, workspace_archive, file_list, patch_record_id)
+                    values (%s, %s, %s, %s, %s::jsonb, %s)
+                    """,
+                    (
+                        snapshot_id,
+                        session_id,
+                        label,
+                        archive,
+                        json.dumps(file_list),
+                        patch_record_id,
+                    ),
+                )
+            connection.commit()
+
+    def get_snapshot(self, snapshot_id: str) -> dict[str, Any]:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    select id, session_id, label, workspace_archive, file_list, patch_record_id, created_at
+                    from snapshots
+                    where id = %s
+                    """,
+                    (snapshot_id,),
+                )
+                row = cursor.fetchone()
+
+        if row is None:
+            raise NotFoundError(f"snapshot {snapshot_id} not found")
+
+        return {
+            "id": row[0],
+            "sessionId": row[1],
+            "label": row[2],
+            "archive": bytes(row[3]),
+            "files": _decode_json(row[4]) or [],
+            "patchRecordId": row[5],
+            "createdAt": row[6].isoformat(),
+        }
+
+    def list_snapshots(self, session_id: str) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    select id, label, file_list, patch_record_id, created_at
+                    from snapshots
+                    where session_id = %s
+                    order by created_at desc
+                    """,
+                    (session_id,),
+                )
+                rows = cursor.fetchall()
+
+        return [
+            {
+                "id": row[0],
+                "sessionId": session_id,
+                "label": row[1],
+                "fileCount": len(_decode_json(row[2]) or []),
+                "files": _decode_json(row[2]) or [],
+                "patchRecordId": row[3],
+                "createdAt": row[4].isoformat(),
+            }
+            for row in rows
+        ]

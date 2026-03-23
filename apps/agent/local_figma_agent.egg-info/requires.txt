@@ -1,0 +1,9 @@
+fastapi<1.0.0,>=0.115.12
+langgraph<1.0.0,>=0.6.0
+openai<2.0.0,>=1.75.0
+psycopg[binary]<4.0.0,>=3.2.6
+uvicorn<1.0.0,>=0.34.0
+
+[dev]
+httpx<1.0.0,>=0.28.1
+pytest<9.0.0,>=8.3.5

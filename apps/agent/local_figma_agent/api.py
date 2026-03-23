@@ -3,17 +3,26 @@ from __future__ import annotations
 import os
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
-from .models import OrchestrationRequest, OrchestrationResponse
+from .models import OrchestrationRequest, OrchestrationResponse, PatchPlan, DesignIntent
 from .orchestrator import AgentOrchestrator
+from .patch_executor import execute_patch as run_patch
 from .providers import build_provider_client, load_provider_config
-from .repository import SessionRepository
+from .repository import SessionRepository, build_project_manifest
 from persistence import BadRequestError, NotFoundError, PersistenceError, PostgresRepository
 from service import PersistenceService
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Local Figma Agent", version="0.1.0")
+
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     provider_config = load_provider_config()
     repository = SessionRepository()
@@ -44,6 +53,9 @@ def create_app() -> FastAPI:
             designIntent=state["designIntent"],
             manifest=state["manifest"],
             patchPlan=state["patchPlan"],
+            patchRecord=state.get("patchRecord"),
+            patchValidation=state.get("patchValidation"),
+            filesWritten=state.get("filesWritten", []),
             memory=state["memory"],
             runtimeStatus=state["runtimeStatus"],
             response=state["response"],
@@ -54,6 +66,68 @@ def create_app() -> FastAPI:
     def provider_smoke() -> dict:
         result = provider_client.smoke()
         return result.model_dump(mode="json")
+
+    @app.post("/execute-patch")
+    def execute_patch_endpoint(payload: dict) -> dict:
+        """Standalone patch execution – accepts a PatchPlan + DesignIntent and executes it."""
+        try:
+            plan = PatchPlan.model_validate(payload["patchPlan"])
+            design_intent = DesignIntent.model_validate(payload["designIntent"])
+        except (KeyError, Exception) as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid payload: {exc}") from exc
+
+        manifest = build_project_manifest()
+        selected_element = None
+        if payload.get("selectedElement"):
+            from .models import SelectedElement
+            selected_element = SelectedElement.model_validate(payload["selectedElement"])
+
+        result = run_patch(
+            plan=plan,
+            design_intent=design_intent,
+            manifest=manifest,
+            provider_client=provider_client,
+            selected_element=selected_element,
+        )
+
+        # Persist the record if persistence is available
+        if persistence_service is not None:
+            try:
+                persistence_service.create_patch_record(plan.sessionId, {
+                    "id": result.record.id,
+                    "patchPlan": plan.model_dump(mode="json"),
+                    "status": result.record.status,
+                    "filesChanged": result.record.filesChanged,
+                    "summary": result.record.summary,
+                })
+            except Exception:
+                pass  # patch record persistence is best-effort
+
+        return {
+            "record": result.record.model_dump(mode="json"),
+            "validation": {
+                "ok": result.validation.ok,
+                "errors": result.validation.errors,
+                "warnings": result.validation.warnings,
+            },
+            "filesWritten": result.files_written,
+            "rollbackPerformed": result.rollback_performed,
+            "error": result.error,
+        }
+
+    @app.get("/workspace/files")
+    def list_workspace_files() -> dict:
+        """List all files in the workspace."""
+        from .file_service import list_files
+        return {"files": list_files()}
+
+    @app.get("/workspace/file")
+    def read_workspace_file(path: str) -> dict:
+        """Read a workspace file content."""
+        from .file_service import read_file as read_ws_file, file_exists
+        if not file_exists(path):
+            raise HTTPException(status_code=404, detail=f"File not found: {path}")
+        return {"path": path, "content": read_ws_file(path)}
 
     def require_persistence_service() -> PersistenceService:
         if persistence_service is None:
@@ -152,6 +226,40 @@ def create_app() -> FastAPI:
         service = require_persistence_service()
         try:
             return service.restore_session(session_id)
+        except PersistenceError as exc:
+            handle_persistence_error(exc)
+
+    # ── Snapshot endpoints (LFG-8) ──────────────────────────────────────────
+
+    @app.post("/sessions/{session_id}/snapshots", status_code=201)
+    def create_snapshot_endpoint(session_id: str, payload: dict) -> dict:
+        service = require_persistence_service()
+        from .snapshot_service import create_snapshot as do_create_snapshot
+        try:
+            return do_create_snapshot(
+                repo=service.repository,
+                session_id=session_id,
+                label=payload.get("label", ""),
+                patch_record_id=payload.get("patchRecordId"),
+            )
+        except PersistenceError as exc:
+            handle_persistence_error(exc)
+
+    @app.get("/sessions/{session_id}/snapshots")
+    def list_snapshots_endpoint(session_id: str) -> list[dict]:
+        service = require_persistence_service()
+        from .snapshot_service import list_snapshots
+        try:
+            return list_snapshots(repo=service.repository, session_id=session_id)
+        except PersistenceError as exc:
+            handle_persistence_error(exc)
+
+    @app.post("/snapshots/{snapshot_id}/restore")
+    def restore_snapshot_endpoint(snapshot_id: str) -> dict:
+        service = require_persistence_service()
+        from .snapshot_service import restore_snapshot
+        try:
+            return restore_snapshot(repo=service.repository, snapshot_id=snapshot_id)
         except PersistenceError as exc:
             handle_persistence_error(exc)
 
